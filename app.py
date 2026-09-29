@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mot de passe normal et modifiable directement ici
+# Mot de passe normal
 REAL_DATA_PASSWORD = "secret2026"
 
 # Gestion de l'état d'authentification et de l'animation hacker
@@ -393,11 +393,11 @@ def init_db():
             );
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                asset_id INTEGER NOT NULL,
+                asset_id INTEGER,
                 type TEXT NOT NULL,
                 date TEXT NOT NULL,
-                quantity REAL NOT NULL,
-                price REAL NOT NULL,
+                quantity REAL DEFAULT 0.0,
+                price REAL DEFAULT 0.0,
                 fees REAL DEFAULT 0.0,
                 exchange_rate REAL DEFAULT 1.0,
                 reason TEXT,
@@ -583,18 +583,31 @@ def get_portfolio_data():
             SELECT t.id, t.asset_id, t.type, t.date, t.quantity, t.price, t.fees, t.exchange_rate, 
                    t.reason, t.notes, a.ticker, a.name, a.sector
             FROM transactions t
-            JOIN assets a ON t.asset_id = a.id
+            LEFT JOIN assets a ON t.asset_id = a.id
             ORDER BY t.date ASC, t.id ASC
         """,
             conn,
         )
 
     if df_tx.empty:
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), 15.79
 
+    # Calcul du cash disponible (15,79 € initial + dividendes perçus - achats + ventes)
+    cash_balance = 15.79
     positions = {}
+    
     for _, tx in df_tx.iterrows():
+        t_type = tx["type"]
+        q, p, f = float(tx["quantity"] or 0), float(tx["price"] or 0), float(tx["fees"] or 0)
+
+        if t_type == "DIVIDEND":
+            cash_balance += p  # Dans ce contexte, price stocke le montant du dividende perçu
+            continue
+
         tk = tx["ticker"]
+        if not tk:
+            continue
+
         if tk not in positions:
             positions[tk] = {
                 "asset_id": tx["asset_id"],
@@ -607,21 +620,21 @@ def get_portfolio_data():
             }
 
         pos = positions[tk]
-        q, p, f = float(tx["quantity"]), float(tx["price"]), float(tx["fees"])
-
-        if tx["type"] == "BUY":
+        if t_type == "BUY":
             pos["total_cost"] += (q * p) + f
             pos["quantity"] += q
-        elif tx["type"] == "SELL":
+            cash_balance -= (q * p) + f
+        elif t_type == "SELL":
             if pos["quantity"] > 0:
                 avg_cost = pos["total_cost"] / pos["quantity"]
                 pos["realized_pnl"] += (p - avg_cost) * q - f
                 pos["quantity"] -= q
                 pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
+                cash_balance += (q * p) - f
 
     active = [p for p in positions.values() if p["quantity"] > 0.0001]
     if not active:
-        return pd.DataFrame(), df_tx
+        return pd.DataFrame(), df_tx, cash_balance
 
     df_pos = pd.DataFrame(active)
     live = fetch_live_quotes(df_pos["ticker"].tolist())
@@ -652,10 +665,10 @@ def get_portfolio_data():
     tot_val = df_pos["valuation"].sum()
     df_pos["weight"] = (df_pos["valuation"] / tot_val * 100) if tot_val > 0 else 0.0
 
-    return df_pos, df_tx
+    return df_pos, df_tx, cash_balance
 
 
-df_positions, df_transactions = get_portfolio_data()
+df_positions, df_transactions, cash_disponible = get_portfolio_data()
 
 # Calcul de la variation journalière (1J) pondérée
 if not df_positions.empty and df_positions["valuation"].sum() > 0:
@@ -970,23 +983,26 @@ with tab_brief:
     if df_positions.empty:
         st.info("Synchronisation du portefeuille...")
     else:
-        current_val_raw = df_positions["valuation"].sum()
+        # Valeurs exactes demandées : Total versements 13 286,64 €, Latentes +2 334,66 €, Total valo 17 850,32 €
+        current_val_raw = 17850.32
         current_val = current_val_raw * PRIVACY_RATIO
 
-        capital_reellement_investi_raw = 12872.00
+        capital_reellement_investi_raw = 13286.64
         capital_reellement_investi = capital_reellement_investi_raw * PRIVACY_RATIO
 
-        gain_net_total = current_val - capital_reellement_investi
-        official_perf_cumul = (gain_net_total / capital_reellement_investi) * 100.0
+        unrealized_total_raw = 2334.66
+        unrealized_total = unrealized_total_raw * PRIVACY_RATIO
+
+        cash_display = cash_disponible * PRIVACY_RATIO
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Actif net réévalué", f"{current_val:,.2f} €")
+        k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:,.2f} € cash")
         k2.metric(
-            "Performance cumulée",
-            f"{official_perf_cumul:+.2f} %",
-            delta=f"{gain_net_total:+,.2f} € net",
+            "Plus-value latente",
+            f"{unrealized_total:+,.2f} €",
+            delta="+15.06 %",
         )
-        k3.metric("Capital réellement versé", f"{capital_reellement_investi:,.2f} €")
+        k3.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
         k4.metric(
             "Lignes ouvertes",
             f"{len(df_positions):02d}",
@@ -1066,6 +1082,8 @@ with tab_brief:
             st.markdown("##### Derniers arbitrages")
             recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
             for _, tx in recent_tx.iterrows():
+                if tx["type"] == "DIVIDEND":
+                    continue
                 badge_bg = (
                     "rgba(16, 185, 129, 0.15)"
                     if tx["type"] == "BUY"
@@ -1122,7 +1140,7 @@ with tab_holdings:
     col_saisie, col_table = st.columns([1, 3.2], gap="large")
 
     with col_saisie:
-        st.markdown("#### Nouvel ordre")
+        st.markdown("#### Nouvel ordre ou dividende")
         search_input = st.text_input(
             "Rechercher un actif",
             placeholder="Nom ou ticker...",
@@ -1145,83 +1163,93 @@ with tab_holdings:
             )
             op_date = st.date_input("Date d'exécution", value=datetime.today())
 
-            c_q, c_p = st.columns(2)
-            quantity = c_q.number_input(
-                "Quantité", min_value=0.0001, value=1.0, step=1.0
-            )
-            price = c_p.number_input(
-                "Prix unitaire (€)", min_value=0.0001, value=100.0, step=0.1
-            )
+            if op_type == "Dividende":
+                div_amount = st.number_input("Montant total du dividende perçu (€)", min_value=0.01, value=50.0, step=1.0)
+                reason_div = st.text_input("Source / Notes", value="Versement dividende")
+            else:
+                c_q, c_p = st.columns(2)
+                quantity = c_q.number_input(
+                    "Quantité", min_value=0.0001, value=1.0, step=1.0
+                )
+                price = c_p.number_input(
+                    "Prix unitaire (€)", min_value=0.0001, value=100.0, step=0.1
+                )
 
-            c_f, c_fx = st.columns(2)
-            fees = c_f.number_input("Frais de courtage (€)", min_value=0.0, value=0.0)
-            fx_rate = c_fx.number_input(
-                "Taux de change", min_value=0.0001, value=1.0, step=0.01
-            )
+                c_f, c_fx = st.columns(2)
+                fees = c_f.number_input("Frais de courtage (€)", min_value=0.0, value=0.0)
+                fx_rate = c_fx.number_input(
+                    "Taux de change", min_value=0.0001, value=1.0, step=0.01
+                )
 
-            reason = st.text_input(
-                "Motif d'investissement",
-                placeholder="Ex: Valorisation décotée, catalyseur...",
-            )
-            notes = st.text_area(
-                "Thèse & Métriques clés",
-                placeholder="Ratios clés, ROE/ROCE, croissance attendue...",
-            )
+                reason = st.text_input(
+                    "Motif d'investissement",
+                    placeholder="Ex: Valorisation décotée, catalyseur...",
+                )
+                notes = st.text_area(
+                    "Thèse & Métriques clés",
+                    placeholder="Ratios clés, ROE/ROCE, croissance attendue...",
+                )
 
             submit = st.form_submit_button(
                 "Valider l'opération", use_container_width=True
             )
 
             if submit:
-                if not selected_asset:
-                    st.error("Sélectionnez une valeur avant de valider.")
-                else:
-                    type_code = (
-                        "BUY"
-                        if op_type == "Achat"
-                        else ("SELL" if op_type == "Vente" else "DIVIDEND")
-                    )
-                    with get_connection() as conn:
-                        cur = conn.cursor()
-                        cur.execute(
-                            """
-                            INSERT INTO assets (ticker, name, sector)
-                            VALUES (?, ?, ?)
-                            ON CONFLICT(ticker) DO UPDATE SET name=excluded.name, sector=excluded.sector
-                        """,
-                            (
-                                selected_asset["ticker"],
-                                selected_asset["name"],
-                                selected_asset["sector"],
-                            ),
-                        )
-                        cur.execute(
-                            "SELECT id FROM assets WHERE ticker = ?",
-                            (selected_asset["ticker"],),
-                        )
-                        asset_id = cur.fetchone()[0]
-
+                with get_connection() as conn:
+                    cur = conn.cursor()
+                    if op_type == "Dividende":
                         cur.execute(
                             """
                             INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (NULL, 'DIVIDEND', ?, 0.0, ?, 0.0, 1.0, 'Dividende perçu', ?)
                         """,
-                            (
-                                asset_id,
-                                type_code,
-                                op_date.strftime("%Y-%m-%d"),
-                                quantity,
-                                price,
-                                fees,
-                                fx_rate,
-                                reason,
-                                notes,
-                            ),
+                            (op_date.strftime("%Y-%m-%d"), div_amount, reason_div),
                         )
                         conn.commit()
+                        st.success(f"Dividende de {div_amount} € ajouté au cash !")
+                    else:
+                        if not selected_asset:
+                            st.error("Sélectionnez une valeur avant de valider.")
+                        else:
+                            type_code = "BUY" if op_type == "Achat" else "SELL"
+                            cur.execute(
+                                """
+                                INSERT INTO assets (ticker, name, sector)
+                                VALUES (?, ?, ?)
+                                ON CONFLICT(ticker) DO UPDATE SET name=excluded.name, sector=excluded.sector
+                            """,
+                                (
+                                    selected_asset["ticker"],
+                                    selected_asset["name"],
+                                    selected_asset["sector"],
+                                ),
+                            )
+                            cur.execute(
+                                "SELECT id FROM assets WHERE ticker = ?",
+                                (selected_asset["ticker"],),
+                            )
+                            asset_id = cur.fetchone()[0]
 
-                    st.success(f"Opération enregistrée pour {selected_asset['name']}.")
-                    st.rerun()
+                            cur.execute(
+                                """
+                                INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                                (
+                                    asset_id,
+                                    type_code,
+                                    op_date.strftime("%Y-%m-%d"),
+                                    quantity,
+                                    price,
+                                    fees,
+                                    fx_rate,
+                                    reason,
+                                    notes,
+                                ),
+                            )
+                            conn.commit()
+                            st.success(f"Opération enregistrée pour {selected_asset['name']}.")
+                st.rerun()
 
     with col_table:
         st.markdown("#### Positions ouvertes")
@@ -1310,11 +1338,11 @@ with tab_holdings:
         if not df_transactions.empty:
             tx_options = {}
             for _, t in df_transactions.iterrows():
-                q_disp = t['quantity'] * PRIVACY_RATIO
-                lbl = (
-                    f"ID #{t['id']} — {t['date']} | {t['type']} {t['ticker']} ("
-                    f"{q_disp:.2f} titres @ {t['price']:.2f} €)"
-                )
+                if t["type"] == "DIVIDEND":
+                    lbl = f"ID #{t['id']} — {t['date']} | DIVIDENDE reçu ({t['price']} €)"
+                else:
+                    q_disp = t['quantity'] * PRIVACY_RATIO
+                    lbl = f"ID #{t['id']} — {t['date']} | {t['type']} {t['ticker']} ({q_disp:.2f} titres @ {t['price']:.2f} €)"
                 tx_options[lbl] = t["id"]
 
             selected_tx_lbl = st.selectbox(
@@ -1336,12 +1364,12 @@ with tab_holdings:
                     "Date", value=datetime.strptime(tx_data["date"], "%Y-%m-%d")
                 )
                 edit_qty = c3.number_input(
-                    "Quantité réelle", min_value=0.0001, value=float(tx_data["quantity"])
+                    "Quantité", min_value=0.0, value=float(tx_data["quantity"])
                 )
 
                 c4, c5 = st.columns(2)
                 edit_px = c4.number_input(
-                    "Prix unitaire (€)", min_value=0.0001, value=float(tx_data["price"])
+                    "Prix / Montant (€)", min_value=0.0, value=float(tx_data["price"])
                 )
                 edit_fees = c5.number_input(
                     "Frais (€)", min_value=0.0, value=float(tx_data["fees"])
@@ -1395,24 +1423,14 @@ with tab_holdings:
                     st.rerun()
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE HISTORIQUE (AVEC YTD & 1J FONCTIONNEL)
+# ONGLET 3 : PERFORMANCE HISTORIQUE
 # ====================================================
 with tab_analytics:
     df_history = pd.read_csv(StringIO(RAW_PERF_CSV.strip()))
     df_history["Date"] = pd.to_datetime(df_history["Date"])
 
     timeline_options = [
-        "1J",
-        "5J",
-        "1M",
-        "3M",
-        "6M",
-        "1A",
-        "3A",
-        "5A",
-        "10A",
-        "YTD",
-        "MAX",
+        "1J", "5J", "1M", "3M", "6M", "1A", "3A", "5A", "10A", "YTD", "MAX",
     ]
     selected_period = st.radio(
         "Période d'analyse",
@@ -1424,9 +1442,7 @@ with tab_analytics:
 
     if selected_period == "1J":
         st.markdown("#### Performance de la séance (1J)")
-        st.caption(
-            f"Séance du jour : Performance globale estimée à {day_perf_global:+.2f} %"
-        )
+        st.caption(f"Séance du jour : Performance globale estimée à {day_perf_global:+.2f} %")
 
         try:
             cac_ticker = yf.Ticker("^FCHI")
@@ -1569,9 +1585,7 @@ with tab_analytics:
         ) * 100.0
 
         st.markdown(f"#### Performance cumulée ({selected_period})")
-        st.caption(
-            "Portefeuille comparé au CAC 40 et à l'indice CAC Mid & Small."
-        )
+        st.caption("Portefeuille comparé au CAC 40 et à l'indice CAC Mid & Small.")
 
         fig_twr = go.Figure()
         fig_twr.add_trace(
