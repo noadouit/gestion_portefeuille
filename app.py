@@ -410,6 +410,40 @@ def init_db():
         """
         )
 
+        # Migration : une ancienne base peut avoir asset_id en NOT NULL,
+        # ce qui empêche d'enregistrer un dividende (qui n'est lié à aucune action)
+        cols_info = conn.execute("PRAGMA table_info(transactions)").fetchall()
+        asset_col = next((c for c in cols_info if c["name"] == "asset_id"), None)
+        if asset_col is not None and asset_col["notnull"] == 1:
+            old_cols = [c["name"] for c in cols_info]
+            wanted = [
+                "id", "asset_id", "type", "date", "quantity", "price",
+                "fees", "exchange_rate", "reason", "notes",
+            ]
+            common = ", ".join(c for c in wanted if c in old_cols)
+            conn.executescript(
+                f"""
+                CREATE TABLE transactions_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    asset_id INTEGER,
+                    type TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    quantity REAL DEFAULT 0.0,
+                    price REAL DEFAULT 0.0,
+                    fees REAL DEFAULT 0.0,
+                    exchange_rate REAL DEFAULT 1.0,
+                    reason TEXT,
+                    notes TEXT,
+                    FOREIGN KEY (asset_id) REFERENCES assets(id)
+                );
+                INSERT INTO transactions_new ({common})
+                    SELECT {common} FROM transactions;
+                DROP TABLE transactions;
+                ALTER TABLE transactions_new RENAME TO transactions;
+                """
+            )
+            conn.commit()
+
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM assets")
         if cur.fetchone()[0] < 5:
@@ -1009,12 +1043,13 @@ with tab_brief:
         cash_display = cash_disponible * PRIVACY_RATIO
 
         # 5 KPIs sur l'accueil : Actif net (avec delta cash propre), Latentes, Réalisées, Versements, Lignes ouvertes
-        k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:+,.2f} € cash")
+        k1, k2, k3, k4, k5, k6 = st.columns(6)
+        k1.metric("Actif net réévalué", f"{current_val:,.2f} €")
         k2.metric("Plus-value latente", f"{unrealized_total:+,.2f} €", delta="+15.06 %")
         k3.metric("Plus-values réalisées", f"{total_realized_display:+,.2f} €", delta="Ventes uniquement")
-        k4.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
-        k5.metric("Lignes ouvertes", f"{len(df_positions):02d}", f"{df_positions['sector'].nunique()} secteurs")
+        k4.metric("Cash disponible", f"{cash_display:,.2f} €", delta="Achats / Ventes / Divs")
+        k5.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
+        k6.metric("Lignes ouvertes", f"{len(df_positions):02d}", f"{df_positions['sector'].nunique()} secteurs")
 
         st.write("")
 
