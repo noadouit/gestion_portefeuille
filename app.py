@@ -27,20 +27,26 @@ if "authenticated" not in st.session_state:
 if "trigger_hacker_fx" not in st.session_state:
     st.session_state["trigger_hacker_fx"] = False
 
-# Animation Hacker plein écran si activée
+# Animation Hacker longue (~4.8s) avec séquence cinéma
 if st.session_state.get("trigger_hacker_fx", False):
     st.session_state["trigger_hacker_fx"] = False
     st.markdown(
         """
         <div id="cyber-overlay">
             <div class="cyber-scanlines"></div>
+            <div class="cyber-radar"></div>
             <div class="cyber-terminal">
-                <div class="cyber-text cyber-green">[SYS_INIT] BYPASSING AIR-GAP ENCRYPTION... [OK]</div>
-                <div class="cyber-text cyber-cyan">[SEC_AUTH] CLEARANCE LEVEL: ROOT_ALPHA IDENTIFIED</div>
-                <div class="cyber-text cyber-green">[PORTFOLIO_NODE] DECRYPTING ASSET LEDGER (AES-256-GCM)...</div>
-                <div class="cyber-text cyber-green">[INJECT] REAL POSITION WEIGHTS LOADED INTO RUNTIME</div>
-                <div class="cyber-glitch-title">ACCESS GRANTED</div>
-                <div class="cyber-sub">> WELCOME BACK, OPERATOR // SYSTEM UNLOCKED</div>
+                <div class="cyber-prompt">> INITIATING ROOT EXPLOIT [KERNEL_v6.12.9-X64]...</div>
+                <div class="cyber-line c-cyan">> Bypassing proxy nodes [PARIS -> ZURICH -> FRANKFURT -> REYKJAVIK] [OK]</div>
+                <div class="cyber-line c-green">> Decrypting RSA-4096 / SHA-512 cold storage keys...</div>
+                <div class="cyber-line c-dim">> 0x7F4A8C0B ... 0x99DF21EA ... MATCH FOUND [100%]</div>
+                <div class="cyber-line c-green">> Injecting decrypted positions ledger into memory pool...</div>
+                <div class="cyber-line c-cyan">> Unmasking true portfolio valuation: SYNCHRONIZING TICKERS...</div>
+                <div class="cyber-line c-green">> OVERRIDING DEMO PRIVACY PROTOCOLS [BYPASS SUCCESSFUL]</div>
+                <div class="cyber-glitch-box">
+                    <div class="cyber-glitch-title">ACCESS GRANTED</div>
+                    <div class="cyber-sub">CLEARANCE: ROOT_ALPHA // TERMINAL UNLOCKED</div>
+                </div>
             </div>
         </div>
 
@@ -48,13 +54,13 @@ if st.session_state.get("trigger_hacker_fx", False):
             #cyber-overlay {
                 position: fixed;
                 top: 0; left: 0; width: 100vw; height: 100vh;
-                background: #020408;
+                background: #010307;
                 z-index: 9999999;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-family: 'JetBrains Mono', monospace;
-                animation: fadeOutCyber 2.5s cubic-bezier(0.8, 0, 0.2, 1) forwards;
+                animation: fadeOutCyber 4.8s cubic-bezier(0.85, 0, 0.15, 1) forwards;
                 pointer-events: none;
             }
             .cyber-scanlines {
@@ -64,64 +70,91 @@ if st.session_state.get("trigger_hacker_fx", False):
                     to bottom,
                     rgba(255,255,255,0),
                     rgba(255,255,255,0) 2px,
-                    rgba(0, 255, 128, 0.04) 3px,
-                    rgba(0, 0, 0, 0.4) 4px
+                    rgba(0, 255, 128, 0.05) 3px,
+                    rgba(0, 0, 0, 0.5) 4px
                 );
                 pointer-events: none;
             }
+            .cyber-radar {
+                position: absolute;
+                width: 600px;
+                height: 600px;
+                border-radius: 50%;
+                border: 1px dashed rgba(16, 185, 129, 0.15);
+                box-shadow: 0 0 100px rgba(16, 185, 129, 0.05);
+                animation: spinRadar 6s linear infinite;
+            }
             .cyber-terminal {
-                text-align: left;
+                position: relative;
                 width: 90%;
-                max-width: 720px;
-                padding: 40px;
-                background: rgba(4, 9, 20, 0.95);
+                max-width: 780px;
+                padding: 42px 46px;
+                background: rgba(3, 8, 18, 0.96);
                 border: 1px solid #10b981;
-                border-radius: 6px;
-                box-shadow: 0 0 50px rgba(16, 185, 129, 0.35), inset 0 0 30px rgba(16, 185, 129, 0.1);
+                border-radius: 8px;
+                box-shadow: 0 0 60px rgba(16, 185, 129, 0.4), inset 0 0 40px rgba(16, 185, 129, 0.08);
             }
-            .cyber-text {
-                font-size: 0.95rem;
-                margin-bottom: 8px;
+            .cyber-prompt {
+                font-size: 1rem;
+                font-weight: 700;
+                color: #ffffff;
+                margin-bottom: 12px;
+                animation: typeLine 0.1s forwards;
+            }
+            .cyber-line {
+                font-size: 0.88rem;
+                margin-bottom: 7px;
                 opacity: 0;
-                animation: lineAppear 0.15s forwards;
+                animation: lineAppear 0.2s forwards;
             }
-            .cyber-green { color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.8); }
-            .cyber-cyan { color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.8); }
+            .c-green { color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.8); }
+            .c-cyan { color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.8); }
+            .c-dim { color: #64748b; font-size: 0.8rem; }
 
-            .cyber-text:nth-child(1) { animation-delay: 0.15s; }
-            .cyber-text:nth-child(2) { animation-delay: 0.45s; }
-            .cyber-text:nth-child(3) { animation-delay: 0.8s; }
-            .cyber-text:nth-child(4) { animation-delay: 1.1s; }
+            .cyber-line:nth-child(2) { animation-delay: 0.4s; }
+            .cyber-line:nth-child(3) { animation-delay: 1.0s; }
+            .cyber-line:nth-child(4) { animation-delay: 1.5s; }
+            .cyber-line:nth-child(5) { animation-delay: 2.1s; }
+            .cyber-line:nth-child(6) { animation-delay: 2.6s; }
+            .cyber-line:nth-child(7) { animation-delay: 3.1s; }
 
+            .cyber-glitch-box {
+                margin-top: 26px;
+                padding-top: 18px;
+                border-top: 1px dashed rgba(16, 185, 129, 0.3);
+                opacity: 0;
+                animation: glitchPulse 0.5s 3.5s forwards;
+            }
             .cyber-glitch-title {
-                margin-top: 25px;
-                font-size: 2.4rem;
+                font-size: 2.5rem;
                 font-weight: 800;
                 color: #ffffff;
-                letter-spacing: 0.15em;
-                text-shadow: 2px 2px #10b981, -2px -2px #06b6d4;
-                opacity: 0;
-                animation: glitchPulse 0.4s 1.35s forwards;
+                letter-spacing: 0.18em;
+                text-shadow: 3px 2px #10b981, -3px -2px #0284c7;
             }
             .cyber-sub {
-                color: #94a3b8;
+                color: #38bdf8;
                 font-size: 0.85rem;
-                margin-top: 6px;
-                opacity: 0;
-                animation: lineAppear 0.2s 1.55s forwards;
+                margin-top: 4px;
+                letter-spacing: 0.08em;
             }
 
+            @keyframes spinRadar {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
             @keyframes lineAppear {
                 to { opacity: 1; }
             }
             @keyframes glitchPulse {
-                0% { opacity: 0; transform: scale(0.96); }
-                50% { opacity: 1; transform: scale(1.02); }
+                0% { opacity: 0; transform: scale(0.95); }
+                40% { opacity: 1; transform: scale(1.03) skewX(-2deg); }
+                70% { opacity: 0.8; transform: scale(0.99) skewX(2deg); }
                 100% { opacity: 1; transform: scale(1); }
             }
             @keyframes fadeOutCyber {
                 0% { opacity: 1; }
-                80% { opacity: 1; }
+                84% { opacity: 1; }
                 100% { opacity: 0; visibility: hidden; }
             }
         </style>
