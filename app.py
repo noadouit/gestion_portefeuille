@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System
+# Design System Compact & Épuré
 st.markdown(
     """
     <style>
@@ -191,7 +191,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header
+# En-tête
 st.markdown(
     """
     <div class="brand-header">
@@ -202,6 +202,200 @@ st.markdown(
 )
 
 DB_PATH = "portfolio.db"
+
+# Données brutes de performance historique officielle fournies
+RAW_PERF_CSV = """Date,Valo,PerfJour,PerfCumul
+2026-01-02,11558.04,0.534,0.534
+2026-01-05,11726.314,0.758,1.296
+2026-01-06,11780.262,0.46,1.762
+2026-01-07,11745.1,-0.355,1.401
+2026-01-08,11606.346,-1.181,0.203
+2026-01-09,11778.692,1.485,1.691
+2026-01-12,11834.628,0.475,2.174
+2026-01-13,11830.518,-0.035,2.139
+2026-01-14,11964.062,1.129,3.292
+2026-01-15,12080.418,0.973,4.296
+2026-01-16,12027.282,-0.44,3.837
+2026-01-19,11907.822,-0.993,2.806
+2026-01-20,11862.312,-0.382,2.413
+2026-01-21,11998.918,1.152,3.593
+2026-01-22,12019.528,0.172,3.77
+2026-01-23,12088.06,0.57,4.362
+2026-01-26,12051.898,-0.299,4.05
+2026-01-27,12048.226,-0.03,4.018
+2026-01-28,12096.156,0.398,4.432
+2026-01-29,12147.866,0.427,4.878
+2026-01-30,12065.986,-0.674,4.172
+2026-02-02,12130.654,0.536,4.73
+2026-02-03,12254.046,1.017,5.795
+2026-02-04,12421.916,1.37,7.244
+2026-02-05,12282.328,-1.124,6.039
+2026-02-06,12319.166,0.3,6.357
+2026-02-09,12481.874,1.321,7.762
+2026-02-10,12540.24,0.468,8.266
+2026-02-11,12560.392,0.161,8.44
+2026-02-12,12483.2,-0.615,7.774
+2026-02-13,12482.982,-0.002,7.772
+2026-02-16,12422.752,-0.482,7.252
+2026-02-17,12401.512,-0.171,7.068
+2026-02-18,12543.112,1.142,8.291
+2026-02-19,12410.654,-1.056,7.147
+2026-02-20,12553.165,1.148,8.378
+2026-02-23,12443.285,-0.875,7.429
+2026-02-24,12499.76,0.454,7.917
+2026-02-25,12581.27,0.652,8.62
+2026-02-26,12866.64,2.268,11.084
+2026-02-27,12828.03,-0.3,10.751
+2026-03-02,12866.04,0.296,11.079
+2026-03-03,12767.11,-0.769,10.225
+2026-03-04,13030.74,2.065,12.501
+2026-03-05,12896.84,-1.028,11.345
+2026-03-06,12898.4,0.012,11.358
+2026-03-09,12844.22,-0.42,10.89
+2026-03-10,12887.02,0.333,11.26
+2026-03-11,12887.13,0.001,11.261
+2026-03-12,12963.07,0.589,11.917
+2026-03-13,12930.23,-0.253,11.633
+2026-03-16,12809.38,-0.935,10.59
+2026-03-17,12987.2,1.388,12.125
+2026-03-18,12887.41,-0.768,11.263
+2026-03-19,12844.41,-0.334,10.892
+2026-03-20,12670.62,-1.353,9.392
+2026-03-23,12569.66,-0.797,8.52
+2026-03-24,12491.73,-0.62,7.847
+2026-03-25,12594.93,0.826,8.738
+2026-03-26,12359.135,-1.872,6.702
+2026-03-27,12241.0,-0.956,5.683
+2026-03-30,12433.76,1.575,7.347
+2026-03-31,12699.62,2.138,9.642
+2026-04-01,12716.44,0.132,9.787
+2026-04-02,12909.96,1.522,11.458
+2026-04-03,12909.96,0.0,11.458
+2026-04-07,12967.38,0.445,11.954
+2026-04-08,13129.36,1.249,13.352
+2026-04-09,13197.15,0.516,13.937
+2026-04-10,13279.32,0.623,14.647
+2026-04-13,13421.07,1.067,15.871
+2026-04-14,13638.83,1.623,17.751
+2026-04-15,15338.75,1.254,19.227
+2026-04-16,15670.71,2.164,21.807
+2026-04-17,15260.06,-2.62,18.615
+2026-04-20,15228.2,-0.209,18.368
+2026-04-21,15304.78,0.503,18.963
+2026-04-22,15344.93,0.262,19.275
+2026-04-23,15372.8,0.182,19.492
+2026-04-24,15432.18,0.386,19.953
+2026-04-27,15538.1,0.686,20.776
+2026-04-28,15644.67,0.686,21.605
+2026-04-29,15811.05,1.063,22.898
+2026-04-30,16018.06,1.309,24.507
+2026-05-04,16168.57,0.94,25.677
+2026-05-05,16314.45,0.902,26.811
+2026-05-06,16298.35,-0.099,26.686
+2026-05-07,16069.09,-1.407,24.904
+2026-05-08,16095.86,0.167,25.112
+2026-05-11,16192.06,0.598,25.86
+2026-05-12,15958.23,-1.444,24.042
+2026-05-13,16125.55,1.048,25.343
+2026-05-14,16264.2,0.86,26.42
+2026-05-15,16334.95,0.435,26.97
+2026-05-18,16648.04,1.917,29.404
+2026-05-19,16648.29,0.002,29.406
+2026-05-20,16529.16,-0.716,28.48
+2026-05-21,16502.46,-0.162,28.272
+2026-05-22,16510.86,0.051,28.338
+2026-05-25,16560.57,0.301,28.724
+2026-05-26,16413.95,-0.885,27.584
+2026-05-27,16067.58,-2.11,24.892
+2026-05-28,16331.53,1.643,26.944
+2026-05-29,16445.61,0.699,27.83
+2026-06-01,16755.32,1.883,30.238
+2026-06-02,16487.84,-1.596,28.159
+2026-06-03,16248.0,-1.455,26.294
+2026-06-04,16703.66,2.804,29.836
+2026-06-05,16494.85,-1.309,28.137
+2026-06-08,16536.68,0.254,28.461
+2026-06-09,16368.49,-1.017,27.155
+2026-06-10,16214.34,-0.942,25.957
+2026-06-11,16040.45,-1.072,24.607
+2026-06-12,16324.9,1.773,26.816
+2026-06-15,16147.53,-1.086,25.438
+2026-06-16,16077.19,-0.436,24.892
+2026-06-17,16245.0,1.044,26.196
+2026-06-18,15958.2,-1.765,23.968
+2026-06-19,15958.17,-0.0,23.967
+2026-06-22,15649.44,-1.935,21.569
+2026-06-23,15654.08,0.03,21.605
+2026-06-24,15475.53,-1.141,20.218
+2026-06-25,15337.98,-0.889,19.15
+2026-06-26,15485.1,0.959,20.292
+2026-06-29,15543.75,0.379,20.748
+2026-06-30,15319.21,-1.445,19.004
+2026-07-01,15418.57,0.649,19.776
+2026-07-02,15595.46,1.147,21.15
+2026-07-03,15998.07,2.582,24.277
+2026-07-06,15964.31,-0.211,24.015
+2026-07-07,16164.85,1.256,25.573
+2026-07-08,15847.99,-1.96,23.112
+2026-07-09,15954.77,0.674,23.941
+2026-07-10,16146.97,1.205,25.434
+2026-07-13,16494.39,2.152,28.133
+2026-07-14,16324.93,-1.027,26.817
+2026-07-15,16686.51,2.215,29.625
+2026-07-16,16800.37,0.682,30.51
+2026-07-17,16705.55,-0.564,29.773
+2026-07-20,16855.93,0.9,30.941
+2026-07-21,16675.81,-1.069,29.542
+2026-07-22,16700.57,0.148,29.735
+2026-07-23,16618.31,-0.493,29.096
+2026-07-24,16985.51,2.21,31.948
+2026-07-27,17315.67,1.944,34.513
+2026-07-28,17983.87,3.859,39.704
+2026-07-29,18608.59,3.474,44.557
+2026-07-30,18029.71,-3.111,40.06
+2026-07-31,18031.93,0.012,40.077
+2026-08-03,18238.67,1.147,41.683
+2026-08-04,18470.65,1.272,43.485
+2026-08-05,18600.31,0.702,44.492
+2026-08-06,18695.33,0.511,45.23
+2026-08-07,18760.47,0.348,45.736
+2026-08-10,18490.29,-1.44,43.638
+2026-08-11,18581.51,0.493,44.346
+2026-08-12,18346.83,-1.263,42.523
+2026-08-13,18457.13,0.601,43.38
+2026-08-14,18748.35,1.578,45.642
+2026-08-17,18503.17,-1.308,43.738
+2026-08-18,18605.03,0.551,44.529
+2026-08-19,18892.22,1.544,46.76
+2026-08-20,18791.18,-0.535,45.975
+2026-08-21,19045.52,1.354,47.951
+2026-08-24,19127.37,0.43,48.587
+2026-08-25,19017.48,-0.575,47.733
+2026-08-26,18899.65,-0.62,46.818
+2026-08-27,18996.69,0.513,47.571
+2026-08-28,18973.88,-0.12,47.394
+2026-08-31,18810.98,-0.859,46.129
+2026-09-01,18789.95,-0.112,45.965
+2026-09-02,18607.97,-0.968,44.552
+2026-09-03,18950.84,1.843,47.215
+2026-09-04,18741.97,-1.102,45.593
+2026-09-07,18406.64,-1.789,42.988
+2026-09-08,18229.98,-0.96,41.615
+2026-09-09,17875.52,-1.944,38.862
+2026-09-10,17952.23,0.429,39.458
+2026-09-11,17915.97,-0.202,39.176
+2026-09-14,18376.14,2.568,42.751
+2026-09-15,18160.71,-1.172,41.077
+2026-09-16,18100.77,-0.33,40.612
+2026-09-17,18167.03,0.366,41.126
+2026-09-18,17926.85,-1.322,39.261
+2026-09-21,17969.07,0.236,39.589
+2026-09-22,17986.97,0.1,39.728
+2026-09-23,18061.35,0.414,40.306
+2026-09-24,17824.35,-1.312,38.464
+2026-09-25,17963.5,0.781,39.545
+2026-09-28,17862.71,-0.561,38.762
+"""
 
 
 def get_connection():
@@ -242,25 +436,45 @@ def init_db():
             );
         """)
 
-
-init_db()
-
-
-def record_hourly_prices(live_quotes):
-  current_slot = datetime.now().strftime("%Y-%m-%d %H:00:00")
-  with get_connection() as conn:
+    # Injection automatique des 10 positions réelles si la base n'a pas encore toutes les lignes
     cur = conn.cursor()
-    for tk, data in live_quotes.items():
-      price = data.get("price", 0.0)
-      if price > 0:
+    cur.execute("SELECT count(*) FROM assets")
+    if cur.fetchone()[0] < 5:
+      holdings_data = [
+          ("TEP.PA", "TELEPERFORMANCE", "Services Numériques", 36.0, 52.13),
+          ("VIL.PA", "VIEL & COMPAGNIE", "Services Financiers", 122.0, 17.32),
+          ("PUB.PA", "PUBLICIS GROUPE", "Communication", 23.0, 77.82),
+          ("EDEN.PA", "EDENRED", "Services & Moyens de paiement", 76.0, 18.45),
+          ("CAP.PA", "CAPGEMINI", "Technologies & Conseil", 20.0, 102.22),
+          ("IPS.PA", "IPSOS", "Études & Médias", 50.0, 30.53),
+          ("SAN.PA", "SANOFI", "Santé & Pharma", 22.0, 73.81),
+          ("SOP.PA", "SOPRA STERIA", "Technologies", 8.0, 135.71),
+          ("ALGIL.PA", "GROUPE GUILLIN", "Emballages & Industrie", 49.0, 21.31),
+          ("FGR.PA", "EIFFAGE", "Construction & Concessions", 9.0, 110.38),
+      ]
+      cur.execute("DELETE FROM transactions")
+      cur.execute("DELETE FROM assets")
+
+      for tk, nm, sec, q, pru in holdings_data:
         cur.execute(
             """
-                    INSERT OR IGNORE INTO price_history (ticker, timestamp, price)
+                    INSERT INTO assets (ticker, name, sector)
                     VALUES (?, ?, ?)
                 """,
-            (tk, current_slot, price),
+            (tk, nm, sec),
         )
-    conn.commit()
+        aid = cur.lastrowid
+        cur.execute(
+            """
+                    INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
+                    VALUES (?, 'BUY', '2026-01-02', ?, ?, 0.0, 1.0, 'Position en portefeuille', 'Consolidation PRU')
+                """,
+            (aid, q, pru),
+        )
+      conn.commit()
+
+
+init_db()
 
 
 def get_french_date():
@@ -442,7 +656,6 @@ def get_portfolio_data():
 
   df_pos = pd.DataFrame(active)
   live = fetch_live_quotes(df_pos["ticker"].tolist())
-  record_hourly_prices(live)
 
   df_pos["pru"] = df_pos["total_cost"] / df_pos["quantity"]
   df_pos["current_price"] = df_pos["ticker"].map(
@@ -515,7 +728,7 @@ with tab_brief:
     st.markdown(
         f"""<div class="index-pill" style="justify-content:center; text-align:center;">
         <div>
-            <div style="font-size:0.72rem; font-weight:600; color:#64748b;">SÉANCE EN COURS</div>
+            <div style="font-size:0.72rem; font-weight:600; color:#64748b;">SÉANCE DU JOUR</div>
             <div style="font-size:0.92rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{get_french_date()}</div>
         </div>
       </div>""",
@@ -525,7 +738,7 @@ with tab_brief:
   st.write("")
 
   if df_positions.empty:
-    st.info("Aucune position active enregistrée.")
+    st.info("Chargement des 10 positions...")
   else:
     cost_basis = df_positions["total_cost"].sum()
     current_val = df_positions["valuation"].sum()
@@ -601,7 +814,7 @@ with tab_brief:
                         <span style="background:{badge_bg}; color:{badge_color}; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:4px;">{badge_lbl}</span>
                         <span style="font-size:0.88rem; font-weight:600; color:#f1f5f9;">{tx['name']}</span>
                     </div>
-                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Arbitrage de gestion'}</div>
+                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Consolidation de ligne'}</div>
                 </div>
                 <div class="mono" style="text-align:right;">
                     <div style="font-size:0.82rem; font-weight:600; color:#ffffff;">{tx['quantity']} × {tx['price']:.2f} €</div>
@@ -633,10 +846,10 @@ with tab_brief:
         news_html += "</div>"
         st.markdown(news_html, unsafe_allow_html=True)
       else:
-        st.caption("Synchronisation du flux financier en cours...")
+        st.caption("Synchronisation des dépêches en cours...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE, ORDRES & GESTION (MODIFICATION / SUPPRESSION)
+# ONGLET 2 : PORTEFEUILLE, ORDRES & GESTION
 # ====================================================
 with tab_holdings:
   col_saisie, col_table = st.columns([1, 2.8], gap="large")
@@ -781,13 +994,10 @@ with tab_holdings:
       )
       st.markdown(table_html, unsafe_allow_html=True)
 
-  # ====================================================
-  # SECTION GESTION : MODIFIER OU SUPPRIMER UNE POSITION / TRANSACTION
-  # ====================================================
+  # Section Gestion
   st.write("")
   st.divider()
   st.markdown("#### Gestion des positions & opérations")
-
   col_del_asset, col_edit_tx = st.columns([1, 1.8], gap="large")
 
   with col_del_asset:
@@ -798,15 +1008,11 @@ with tab_holdings:
           for _, row in df_positions.iterrows()
       }
       asset_selected_label = st.selectbox(
-          "Sélectionner la valeur à retirer entièrement :",
+          "Sélectionner la valeur à retirer :",
           list(asset_dict.keys()),
           key="del_asset_select",
       )
       ticker_to_delete = asset_dict[asset_selected_label]
-
-      st.caption(
-          "Cette action supprimera toutes les transactions associées à cette valeur dans la base."
-      )
 
       if st.button(
           f"Supprimer la ligne {ticker_to_delete}",
@@ -825,20 +1031,13 @@ with tab_holdings:
                 "DELETE FROM transactions WHERE asset_id = ?", (aid,)
             )
             cur.execute("DELETE FROM assets WHERE id = ?", (aid,))
-            cur.execute(
-                "DELETE FROM price_history WHERE ticker = ?",
-                (ticker_to_delete,),
-            )
             conn.commit()
-        st.success(f"La valeur {ticker_to_delete} a été retirée du portefeuille.")
+        st.success(f"La valeur {ticker_to_delete} a été retirée.")
         st.rerun()
-    else:
-      st.caption("Aucune ligne active à supprimer.")
 
   with col_edit_tx:
     st.markdown("##### Modifier ou supprimer une transaction précise")
     if not df_transactions.empty:
-      # Menu de sélection d'une transaction
       tx_options = {}
       for _, t in df_transactions.iterrows():
         lbl = (
@@ -848,7 +1047,7 @@ with tab_holdings:
         tx_options[lbl] = t["id"]
 
       selected_tx_lbl = st.selectbox(
-          "Sélectionner l'opération à éditer :",
+          "Sélectionner l'opération :",
           list(tx_options.keys()),
           key="edit_tx_select",
       )
@@ -913,7 +1112,7 @@ with tab_holdings:
                 ),
             )
             conn.commit()
-          st.success("Transaction mise à jour avec succès.")
+          st.success("Transaction mise à jour.")
           st.rerun()
 
         if delete_tx:
@@ -923,305 +1122,248 @@ with tab_holdings:
             conn.commit()
           st.warning("Transaction supprimée.")
           st.rerun()
-    else:
-      st.caption("Aucune transaction enregistrée.")
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE, TWR & MULTIPLES
+# ONGLET 3 : PERFORMANCE HISTORIQUE EXACTE (COURBE CSV RÉELLE)
 # ====================================================
 with tab_analytics:
-  if df_transactions.empty:
-    st.info("Données insuffisantes pour générer la performance.")
+  # Chargement direct du DataFrame de performance réelle
+  from io import StringIO
+
+  df_history = pd.read_csv(StringIO(RAW_PERF_CSV.strip()))
+  df_history["Date"] = pd.to_datetime(df_history["Date"])
+
+  # Timeline Selector
+  timeline_options = [
+      "1J",
+      "5J",
+      "1M",
+      "3M",
+      "6M",
+      "1A",
+      "3A",
+      "5A",
+      "10A",
+      "MAX",
+  ]
+  selected_period = st.radio(
+      "Période d'analyse",
+      timeline_options,
+      index=9,  # MAX par défaut
+      horizontal=True,
+      label_visibility="collapsed",
+  )
+
+  last_dt = df_history["Date"].max()
+  period_deltas = {
+      "1J": timedelta(days=2),
+      "5J": timedelta(days=7),
+      "1M": timedelta(days=30),
+      "3M": timedelta(days=90),
+      "6M": timedelta(days=180),
+      "1A": timedelta(days=365),
+      "3A": timedelta(days=365 * 3),
+      "5A": timedelta(days=365 * 5),
+      "10A": timedelta(days=365 * 10),
+  }
+
+  if selected_period == "MAX":
+    start_filter = df_history["Date"].min()
   else:
-    timeline_options = [
-        "1J",
-        "5J",
-        "1M",
-        "3M",
-        "6M",
-        "1A",
-        "3A",
-        "5A",
-        "10A",
-        "MAX",
-    ]
-    selected_period = st.radio(
-        "Période d'analyse",
-        timeline_options,
-        index=0,
-        horizontal=True,
-        label_visibility="collapsed",
+    start_filter = max(
+        df_history["Date"].min(), last_dt - period_deltas[selected_period]
     )
 
-    first_tx_date = pd.to_datetime(df_transactions["date"].min())
-    now_date = datetime.now()
+  filtered_df = (
+      df_history[df_history["Date"] >= start_filter].copy().sort_values("Date")
+  )
 
-    period_deltas = {
-        "1J": timedelta(days=2),
-        "5J": timedelta(days=7),
-        "1M": timedelta(days=30),
-        "3M": timedelta(days=90),
-        "6M": timedelta(days=180),
-        "1A": timedelta(days=365),
-        "3A": timedelta(days=365 * 3),
-        "5A": timedelta(days=365 * 5),
-        "10A": timedelta(days=365 * 10),
-    }
+  # Ré-étalonnage relatif sur la période choisie
+  base_cumul = filtered_df["PerfCumul"].iloc[0]
+  # Formule de rendement relatif: ((1 + r_t) / (1 + r_0) - 1) * 100
+  filtered_df["Portfolio_Return_Pct"] = (
+      (1.0 + filtered_df["PerfCumul"] / 100.0)
+      / (1.0 + base_cumul / 100.0)
+      - 1.0
+  ) * 100.0
 
-    is_intraday = selected_period == "1J"
-    interval = "5m" if is_intraday else ("60m" if selected_period == "5J" else "1d")
+  # Récupération du benchmark CAC 40 sur la même plage
+  bench_df = yf.download(
+      "^FCHI", start=start_filter - timedelta(days=5), progress=False
+  )["Close"]
+  if isinstance(bench_df, pd.Series):
+    bench_df = bench_df.to_frame(name="^FCHI")
+  bench_df = bench_df.ffill().bfill()
+  if hasattr(bench_df.index, "tz") and bench_df.index.tz is not None:
+    bench_df.index = bench_df.index.tz_convert(None)
 
-    if selected_period == "MAX":
-      query_start_date = first_tx_date - timedelta(days=5)
-    elif is_intraday:
-      query_start_date = now_date - timedelta(days=3)
+  # Aligner le CAC 40 sur les dates du portefeuille
+  bench_aligned = []
+  for dt in filtered_df["Date"]:
+    if dt in bench_df.index:
+      bench_aligned.append(float(bench_df.loc[dt, "^FCHI"]))
     else:
-      calculated_start = now_date - period_deltas[selected_period]
-      query_start_date = max(first_tx_date - timedelta(days=5), calculated_start)
+      # Dernier cours disponible avant cette date
+      prior_dt = bench_df.index[bench_df.index <= dt]
+      bench_aligned.append(
+          float(bench_df.loc[prior_dt[-1], "^FCHI"])
+          if len(prior_dt) > 0
+          else 1.0
+      )
 
-    tickers_list = df_transactions["ticker"].unique().tolist()
+  filtered_df["CAC_Close"] = bench_aligned
+  base_cac = filtered_df["CAC_Close"].iloc[0]
+  filtered_df["CAC_Return_Pct"] = (
+      (filtered_df["CAC_Close"] / base_cac) - 1.0
+  ) * 100.0
 
-    with st.spinner("Calcul de la rentabilité financière..."):
-      tickers_with_bench = tickers_list + ["^FCHI"]
-      raw_prices = yf.download(
-          tickers_with_bench,
-          start=query_start_date,
-          interval=interval,
-          progress=False,
-      )["Close"]
-      if isinstance(raw_prices, pd.Series):
-        raw_prices = raw_prices.to_frame(name=tickers_with_bench[0])
-      raw_prices = raw_prices.ffill().bfill()
+  st.markdown("#### Performance cumulée (%)")
+  st.caption(
+      "Historique officiel consolidé du portefeuille vs Benchmark CAC 40."
+  )
 
-      if hasattr(raw_prices.index, "tz") and raw_prices.index.tz is not None:
-        raw_prices.index = raw_prices.index.tz_convert("Europe/Paris").tz_localize(None)
+  fig_twr = go.Figure()
+  fig_twr.add_trace(
+      go.Scatter(
+          x=filtered_df["Date"],
+          y=filtered_df["Portfolio_Return_Pct"],
+          mode="lines",
+          name="Portefeuille",
+          line=dict(color="#38bdf8", width=2.4),
+      )
+  )
+  fig_twr.add_trace(
+      go.Scatter(
+          x=filtered_df["Date"],
+          y=filtered_df["CAC_Return_Pct"],
+          mode="lines",
+          name="CAC 40",
+          line=dict(color="#64748b", width=1.5, dash="dot"),
+      )
+  )
 
-      if is_intraday and not raw_prices.empty:
-        last_trading_day = raw_prices.index[-1].date()
-        raw_prices = raw_prices[raw_prices.index.date == last_trading_day]
+  fig_twr.add_hline(
+      y=0, line_dash="solid", line_color="rgba(255,255,255,0.15)", line_width=1
+  )
 
-      trading_points = raw_prices.index.tolist()
+  fig_twr.update_layout(
+      hovermode="x unified",
+      plot_bgcolor="rgba(0,0,0,0)",
+      paper_bgcolor="rgba(0,0,0,0)",
+      font=dict(color="#94a3b8"),
+      margin=dict(t=10, b=10, l=10, r=10),
+      xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+      yaxis=dict(
+          showgrid=True,
+          gridcolor="rgba(255,255,255,0.05)",
+          title="Rendement (%)",
+          ticksuffix=" %",
+      ),
+      legend=dict(
+          orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+      ),
+  )
+  st.plotly_chart(fig_twr, use_container_width=True)
 
-      twr_records = []
-      cumulative_twr = 1.0
-      prev_portfolio_val = 0.0
+  st.write("")
 
-      for i, pt in enumerate(trading_points):
-        pt_date_str = pt.strftime("%Y-%m-%d")
-        day_tx = df_transactions[df_transactions["date"] == pt_date_str]
-        inflow = 0.0
-        if not day_tx.empty and (not is_intraday or pt.hour == 9 and pt.minute <= 10):
-          for _, r in day_tx.iterrows():
-            if r["type"] == "BUY":
-              inflow += (r["quantity"] * r["price"]) + r["fees"]
-            elif r["type"] == "SELL":
-              inflow -= (r["quantity"] * r["price"]) - r["fees"]
+  # Répartition, P&L et PER
+  c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
 
-        sub_tx = df_transactions[pd.to_datetime(df_transactions["date"]) <= pt]
-        end_val = 0.0
-        for tk in tickers_list:
-          tx_tk = sub_tx[sub_tx["ticker"] == tk]
-          q = tx_tk[tx_tk["type"] == "BUY"]["quantity"].sum() - tx_tk[
-              tx_tk["type"] == "SELL"
-          ]["quantity"].sum()
-          if q > 0 and tk in raw_prices.columns:
-            px_val = raw_prices.loc[pt, tk]
-            if pd.notnull(px_val):
-              end_val += q * float(px_val)
+  with c_g1:
+    st.markdown("#### Structure du capital")
+    if not df_positions.empty:
+      fig_donut = px.pie(
+          df_positions,
+          values="valuation",
+          names="name",
+          hole=0.6,
+          color_discrete_sequence=[
+              "#38bdf8",
+              "#0284c7",
+              "#0369a1",
+              "#025985",
+              "#075985",
+              "#60a5fa",
+              "#93c5fd",
+          ],
+      )
+      fig_donut.update_layout(
+          margin=dict(t=10, b=10, l=10, r=10),
+          paper_bgcolor="rgba(0,0,0,0)",
+          plot_bgcolor="rgba(0,0,0,0)",
+          font=dict(color="#f8fafc"),
+          showlegend=True,
+      )
+      st.plotly_chart(fig_donut, use_container_width=True)
 
-        if i == 0:
-          start_capital = inflow if inflow > 0 else end_val
-          sub_return = (
-              (end_val / start_capital) - 1.0 if start_capital > 0 else 0.0
+  with c_g2:
+    st.markdown("#### Plus / Moins-values (€)")
+    if not df_positions.empty:
+      sorted_contrib = df_positions.sort_values(
+          "unrealized_pnl", ascending=True
+      )
+      bar_colors = [
+          "#10b981" if v >= 0 else "#f43f5e"
+          for v in sorted_contrib["unrealized_pnl"]
+      ]
+
+      fig_contrib = go.Figure(
+          go.Bar(
+              x=sorted_contrib["unrealized_pnl"],
+              y=sorted_contrib["name"],
+              orientation="h",
+              marker=dict(color=bar_colors),
           )
-        else:
-          base = prev_portfolio_val + inflow
-          sub_return = (end_val - base) / base if base > 0 else 0.0
-
-        cumulative_twr *= 1.0 + sub_return
-        prev_portfolio_val = end_val
-
-        bench_close = (
-            raw_prices.loc[pt, "^FCHI"]
-            if "^FCHI" in raw_prices.columns
-            else 1.0
-        )
-
-        twr_records.append({
-            "Date": pt,
-            "TWR_Raw": cumulative_twr,
-            "Benchmark_Close": bench_close,
-        })
-
-      df_twr = pd.DataFrame(twr_records)
-
-      if not df_twr.empty:
-        base_twr = df_twr["TWR_Raw"].iloc[0]
-        df_twr["Portfolio_Return_Pct"] = (
-            (df_twr["TWR_Raw"] / base_twr) - 1.0
-        ) * 100.0
-
-        if "^FCHI" in raw_prices.columns and df_twr["Benchmark_Close"].iloc[0] > 0:
-          base_bench = df_twr["Benchmark_Close"].iloc[0]
-          df_twr["CAC_Return_Pct"] = (
-              (df_twr["Benchmark_Close"] / base_bench) - 1.0
-          ) * 100.0
-
-      st.markdown("#### Performance cumulée (%)")
-      st.caption(
-          "Calcul pondéré dans le temps (TWR) neutralisant les flux de trésorerie."
       )
-
-      fig_twr = go.Figure()
-      fig_twr.add_trace(
-          go.Scatter(
-              x=df_twr["Date"],
-              y=df_twr["Portfolio_Return_Pct"],
-              mode="lines",
-              name="Portefeuille",
-              line=dict(color="#38bdf8", width=2.4),
-          )
-      )
-      if "^FCHI" in raw_prices.columns:
-        fig_twr.add_trace(
-            go.Scatter(
-                x=df_twr["Date"],
-                y=df_twr["CAC_Return_Pct"],
-                mode="lines",
-                name="CAC 40",
-                line=dict(color="#64748b", width=1.5, dash="dot"),
-            )
-        )
-
-      fig_twr.add_hline(
-          y=0, line_dash="solid", line_color="rgba(255,255,255,0.15)", line_width=1
-      )
-
-      xaxis_config = dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)")
-      if is_intraday and not df_twr.empty:
-        session_date = df_twr["Date"].iloc[-1].strftime("%Y-%m-%d")
-        xaxis_config.update(
-            range=[f"{session_date} 09:00:00", f"{session_date} 17:35:00"],
-            tickformat="%H:%M",
-        )
-
-      fig_twr.update_layout(
-          hovermode="x unified",
+      fig_contrib.update_layout(
           plot_bgcolor="rgba(0,0,0,0)",
           paper_bgcolor="rgba(0,0,0,0)",
           font=dict(color="#94a3b8"),
           margin=dict(t=10, b=10, l=10, r=10),
-          xaxis=xaxis_config,
-          yaxis=dict(
+          xaxis=dict(
               showgrid=True,
               gridcolor="rgba(255,255,255,0.05)",
-              title="Rendement (%)",
-              ticksuffix=" %",
+              title="P&L (€)",
           ),
-          legend=dict(
-              orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+          yaxis=dict(showgrid=False, tickfont=dict(color="#f8fafc")),
+      )
+      st.plotly_chart(fig_contrib, use_container_width=True)
+
+  with c_g3:
+    st.markdown("#### Multiples P/E")
+    pe_df = (
+        df_positions.dropna(subset=["pe"])[["name", "pe"]]
+        .sort_values("pe")
+        .copy()
+    )
+    if not pe_df.empty:
+      fig_pe = px.bar(
+          pe_df,
+          x="pe",
+          y="name",
+          orientation="h",
+          color="pe",
+          color_continuous_scale=["#3b82f6", "#1d4ed8"],
+      )
+      fig_pe.update_layout(
+          margin=dict(t=10, b=10, l=10, r=10),
+          height=280,
+          xaxis=dict(
+              gridcolor="rgba(255,255,255,0.05)",
+              title="Ratio P/E",
+              tickfont=dict(family="JetBrains Mono"),
           ),
+          yaxis=dict(
+              gridcolor="rgba(255,255,255,0.05)",
+              title="",
+              tickfont=dict(color="#f8fafc"),
+          ),
+          plot_bgcolor="rgba(0,0,0,0)",
+          paper_bgcolor="rgba(0,0,0,0)",
+          coloraxis_showscale=False,
       )
-      st.plotly_chart(fig_twr, use_container_width=True)
-
-    st.write("")
-
-    c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
-
-    with c_g1:
-      st.markdown("#### Structure du capital")
-      if not df_positions.empty:
-        fig_donut = px.pie(
-            df_positions,
-            values="valuation",
-            names="name",
-            hole=0.6,
-            color_discrete_sequence=[
-                "#38bdf8",
-                "#0284c7",
-                "#0369a1",
-                "#025985",
-                "#075985",
-            ],
-        )
-        fig_donut.update_layout(
-            margin=dict(t=10, b=10, l=10, r=10),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#f8fafc"),
-            showlegend=True,
-        )
-        st.plotly_chart(fig_donut, use_container_width=True)
-
-    with c_g2:
-      st.markdown("#### Plus / Moins-values (€)")
-      if not df_positions.empty:
-        sorted_contrib = df_positions.sort_values(
-            "unrealized_pnl", ascending=True
-        )
-        bar_colors = [
-            "#10b981" if v >= 0 else "#f43f5e"
-            for v in sorted_contrib["unrealized_pnl"]
-        ]
-
-        fig_contrib = go.Figure(
-            go.Bar(
-                x=sorted_contrib["unrealized_pnl"],
-                y=sorted_contrib["name"],
-                orientation="h",
-                marker=dict(color=bar_colors),
-            )
-        )
-        fig_contrib.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#94a3b8"),
-            margin=dict(t=10, b=10, l=10, r=10),
-            xaxis=dict(
-                showgrid=True,
-                gridcolor="rgba(255,255,255,0.05)",
-                title="P&L (€)",
-            ),
-            yaxis=dict(showgrid=False, tickfont=dict(color="#f8fafc")),
-        )
-        st.plotly_chart(fig_contrib, use_container_width=True)
-
-    with c_g3:
-      st.markdown("#### Multiples P/E")
-      pe_df = (
-          df_positions.dropna(subset=["pe"])[["name", "pe"]]
-          .sort_values("pe")
-          .copy()
-      )
-      if not pe_df.empty:
-        fig_pe = px.bar(
-            pe_df,
-            x="pe",
-            y="name",
-            orientation="h",
-            color="pe",
-            color_continuous_scale=["#3b82f6", "#1d4ed8"],
-        )
-        fig_pe.update_layout(
-            margin=dict(t=10, b=10, l=10, r=10),
-            height=280,
-            xaxis=dict(
-                gridcolor="rgba(255,255,255,0.05)",
-                title="Ratio P/E",
-                tickfont=dict(family="JetBrains Mono"),
-            ),
-            yaxis=dict(
-                gridcolor="rgba(255,255,255,0.05)",
-                title="",
-                tickfont=dict(color="#f8fafc"),
-            ),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            coloraxis_showscale=False,
-        )
-        st.plotly_chart(fig_pe, use_container_width=True)
-      else:
-        st.caption("Multiples indisponibles sur les lignes actives.")
+      st.plotly_chart(fig_pe, use_container_width=True)
 
 # ====================================================
 # ONGLET 4 : JOURNAL DES OPÉRATIONS
