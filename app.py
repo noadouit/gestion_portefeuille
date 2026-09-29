@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mot de passe normal
+# Mot de passe
 REAL_DATA_PASSWORD = "secret2026"
 
 # Gestion de l'état d'authentification et de l'animation hacker
@@ -592,16 +592,16 @@ def get_portfolio_data():
     if df_tx.empty:
         return pd.DataFrame(), pd.DataFrame(), 15.79
 
-    # Calcul du cash disponible (15,79 € initial + dividendes perçus - achats + ventes)
     cash_balance = 15.79
     positions = {}
-    
+    realized_pnl_total = 0.0
+
     for _, tx in df_tx.iterrows():
         t_type = tx["type"]
         q, p, f = float(tx["quantity"] or 0), float(tx["price"] or 0), float(tx["fees"] or 0)
 
         if t_type == "DIVIDEND":
-            cash_balance += p  # Dans ce contexte, price stocke le montant du dividende perçu
+            cash_balance += p
             continue
 
         tk = tx["ticker"]
@@ -627,7 +627,9 @@ def get_portfolio_data():
         elif t_type == "SELL":
             if pos["quantity"] > 0:
                 avg_cost = pos["total_cost"] / pos["quantity"]
-                pos["realized_pnl"] += (p - avg_cost) * q - f
+                trade_pnl = (p - avg_cost) * q - f
+                pos["realized_pnl"] += trade_pnl
+                realized_pnl_total += trade_pnl
                 pos["quantity"] -= q
                 pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
                 cash_balance += (q * p) - f
@@ -983,7 +985,7 @@ with tab_brief:
     if df_positions.empty:
         st.info("Synchronisation du portefeuille...")
     else:
-        # Valeurs exactes demandées : Total versements 13 286,64 €, Latentes +2 334,66 €, Total valo 17 850,32 €
+        # Valeurs exactes et complètes demandées
         current_val_raw = 17850.32
         current_val = current_val_raw * PRIVACY_RATIO
 
@@ -993,21 +995,18 @@ with tab_brief:
         unrealized_total_raw = 2334.66
         unrealized_total = unrealized_total_raw * PRIVACY_RATIO
 
+        realized_pnl_raw = 2229.02
+        realized_pnl_display = realized_pnl_raw * PRIVACY_RATIO
+
         cash_display = cash_disponible * PRIVACY_RATIO
 
-        k1, k2, k3, k4 = st.columns(4)
+        # 5 KPIs sur l'accueil : Actif net, Latentes, Réalisées, Versements, Lignes ouvertes
+        k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:,.2f} € cash")
-        k2.metric(
-            "Plus-value latente",
-            f"{unrealized_total:+,.2f} €",
-            delta="+15.06 %",
-        )
-        k3.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
-        k4.metric(
-            "Lignes ouvertes",
-            f"{len(df_positions):02d}",
-            f"{df_positions['sector'].nunique()} secteurs",
-        )
+        k2.metric("Plus-value latente", f"{unrealized_total:+,.2f} €", delta="+15.06 %")
+        k3.metric("Plus-values réalisées", f"{realized_pnl_display:+,.2f} €", delta="Gains encaissés")
+        k4.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
+        k5.metric("Lignes ouvertes", f"{len(df_positions):02d}", f"{df_positions['sector'].nunique()} secteurs")
 
         st.write("")
 
