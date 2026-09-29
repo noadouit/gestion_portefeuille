@@ -498,21 +498,41 @@ def get_french_date():
     return f"{now.day} {mois[now.month - 1]} {now.year}"
 
 
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_index(symbol):
+    """Dernier cours + clôture précédente. Lève une exception en cas d'échec,
+    ce qui évite que Streamlit mette en cache une valeur à 0."""
+    tk = yf.Ticker(symbol)
+    price, prev = None, None
+
+    # 1) Cours le plus récent (fast_info)
+    try:
+        fi = tk.fast_info
+        price = getattr(fi, "last_price", None)
+        prev = getattr(fi, "previous_close", None)
+    except Exception:
+        price, prev = None, None
+
+    # 2) Repli : historique journalier
+    if not price or not prev:
+        closes = tk.history(period="5d", interval="1d")["Close"].dropna()
+        if len(closes) >= 2:
+            price = float(closes.iloc[-1])
+            prev = float(closes.iloc[-2])
+
+    if not price or not prev:
+        raise ValueError(f"Données indisponibles pour {symbol}")
+
+    price, prev = float(price), float(prev)
+    return {"price": price, "change": (price - prev) / prev * 100}
+
+
 def get_market_indices():
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^TNX": "US 10Y Bond"}
     out = {}
     for symbol, name in indices.items():
         try:
-            tk = yf.Ticker(symbol)
-            hist = tk.history(period="5d")
-            if len(hist) >= 2:
-                c = hist["Close"].iloc[-1]
-                p = hist["Close"].iloc[-2]
-                chg = ((c - p) / p) * 100
-                out[name] = {"price": c, "change": chg}
-            else:
-                out[name] = {"price": 0.0, "change": 0.0}
+            out[name] = _fetch_index(symbol)
         except Exception:
             out[name] = {"price": 0.0, "change": 0.0}
     return out
