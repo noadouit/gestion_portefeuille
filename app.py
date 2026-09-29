@@ -14,13 +14,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System Moderne (SaaS FinTech / Minimalist Dark)
+# Design System Moderne & Épuré
 st.markdown(
     """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
-        /* Base & Global Styles */
         html, body, [class*="css"] {
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             background-color: #080c14;
@@ -33,14 +32,12 @@ st.markdown(
             max-width: 1440px;
         }
 
-        /* Glassmorphism Cards */
+        /* Cartes & Composants */
         .glass-card {
             background: linear-gradient(135deg, rgba(17, 24, 39, 0.7) 0%, rgba(15, 23, 42, 0.5) 100%);
             border: 1px solid rgba(255, 255, 255, 0.07);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
             border-radius: 12px;
             padding: 20px;
-            backdrop-filter: blur(12px);
         }
 
         .index-pill {
@@ -57,9 +54,9 @@ st.markdown(
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Modern Tabs */
+        /* Menu de navigation propre sans hover criard */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 10px;
+            gap: 8px;
             background-color: transparent;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             padding-bottom: 8px;
@@ -67,51 +64,48 @@ st.markdown(
         }
 
         .stTabs [data-baseweb="tab"] {
-            padding: 8px 20px;
+            padding: 8px 18px;
             border-radius: 8px;
-            background-color: rgba(255, 255, 255, 0.03);
-            border: 1px solid transparent;
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
             font-size: 0.9rem;
-            font-weight: 600;
-            color: #64748b;
-            transition: all 0.2s ease-in-out;
+            font-weight: 500;
+            color: #94a3b8;
+            transition: color 0.15s ease;
         }
 
         .stTabs [data-baseweb="tab"]:hover {
-            color: #f1f5f9;
-            background-color: rgba(255, 255, 255, 0.06);
+            color: #e2e8f0;
+            background-color: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
         }
 
         .stTabs [aria-selected="true"] {
-            background: #2563eb !important;
-            color: #ffffff !important;
-            border-color: #3b82f6 !important;
-            box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
+            background: #1e293b !important;
+            color: #38bdf8 !important;
+            border-color: #38bdf8 !important;
+            font-weight: 600 !important;
         }
 
-        /* Form Inputs */
+        /* Inputs & Sélecteurs */
         div[data-baseweb="input"], div[data-baseweb="select"] {
             border-radius: 8px !important;
             background-color: #0f172a !important;
             border-color: rgba(255, 255, 255, 0.1) !important;
         }
 
-        /* Metrics */
         [data-testid="stMetricValue"] {
             font-size: 1.85rem !important;
             font-weight: 700 !important;
             color: #ffffff !important;
-            font-family: 'Plus Jakarta Sans', sans-serif !important;
         }
 
-        /* Buttons */
         button[kind="primary"], .stButton > button {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            background: #2563eb !important;
+            border: 1px solid #3b82f6 !important;
             border-radius: 8px !important;
             font-weight: 600 !important;
             padding: 10px 20px !important;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
         }
     </style>
 """,
@@ -306,7 +300,7 @@ def get_portfolio_data():
 
 df_positions, df_transactions = get_portfolio_data()
 
-# Navigation
+# Navigation principale
 tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
     "Marchés & Synthèse",
     "Portefeuille & Ordres",
@@ -488,7 +482,7 @@ with tab_brief:
         )
         st.plotly_chart(fig_pe, use_container_width=True)
       else:
-        st.caption("Données de valorisation en cours de synchronisation.")
+        st.caption("Données de multiples indisponibles.")
 
 # ====================================================
 # ONGLET 2 : PORTEFEUILLE & ORDRES
@@ -644,27 +638,68 @@ with tab_holdings:
       )
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE & TWR
+# ONGLET 3 : PERFORMANCE, TWR & SÉLECTEUR DE TIMELINE
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
-    st.info("Données insuffisantes pour générer la courbe TWR.")
+    st.info("Données insuffisantes pour générer la performance.")
   else:
-    min_date = pd.to_datetime(df_transactions["date"].min())
+    # Barre de sélection de la période
+    timeline_options = [
+        "1J",
+        "5J",
+        "1M",
+        "3M",
+        "6M",
+        "1A",
+        "3A",
+        "5A",
+        "10A",
+        "MAX",
+    ]
+    selected_period = st.radio(
+        "Période d'analyse",
+        timeline_options,
+        index=9,  # MAX par défaut
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    first_tx_date = pd.to_datetime(df_transactions["date"].min())
+    now_date = datetime.now()
+
+    # Calcul de la date de départ selon la période
+    period_deltas = {
+        "1J": timedelta(days=2),
+        "5J": timedelta(days=7),
+        "1M": timedelta(days=30),
+        "3M": timedelta(days=90),
+        "6M": timedelta(days=180),
+        "1A": timedelta(days=365),
+        "3A": timedelta(days=365 * 3),
+        "5A": timedelta(days=365 * 5),
+        "10A": timedelta(days=365 * 10),
+    }
+
+    if selected_period == "MAX":
+      query_start_date = first_tx_date - timedelta(days=5)
+    else:
+      calculated_start = now_date - period_deltas[selected_period]
+      query_start_date = max(first_tx_date - timedelta(days=5), calculated_start)
+
     tickers_list = df_transactions["ticker"].unique().tolist()
 
     with st.spinner("Calcul de la performance financière..."):
       tickers_with_bench = tickers_list + ["^FCHI"]
       raw_prices = yf.download(
-          tickers_with_bench,
-          start=min_date - timedelta(days=5),
-          progress=False,
+          tickers_with_bench, start=query_start_date, progress=False
       )["Close"]
       if isinstance(raw_prices, pd.Series):
         raw_prices = raw_prices.to_frame(name=tickers_with_bench[0])
       raw_prices = raw_prices.ffill().bfill()
 
-      trading_days = [d for d in raw_prices.index if d >= min_date]
+      # Filtrage des jours ouvrés sur la période active
+      trading_days = [d for d in raw_prices.index if d >= query_start_date]
 
       twr_records = []
       cumulative_twr = 1.0
@@ -718,19 +753,18 @@ with tab_analytics:
 
       df_twr = pd.DataFrame(twr_records)
 
-      if not df_twr.empty and df_twr["Benchmark_Close"].iloc[0] > 0:
-        base_bench = df_twr["Benchmark_Close"].iloc[0]
-        df_twr["Benchmark_Index"] = (
-            df_twr["Benchmark_Close"] / base_bench
-        ) * 100.0
+      # Ré-étalonnage de la base 100 au premier jour de la sélection
+      if not df_twr.empty:
+        base_twr = df_twr["TWR_Index"].iloc[0]
+        df_twr["TWR_Index"] = (df_twr["TWR_Index"] / base_twr) * 100.0
 
-      # Courbe TWR épurée
-      st.markdown("#### Performance Pondérée dans le Temps (Base 100)")
-      st.caption(
-          "La méthode TWR isole les performances intrinsèques des arbitrages en"
-          " neutralisant l'effet des apports de liquidités."
-      )
+        if "^FCHI" in raw_prices.columns and df_twr["Benchmark_Close"].iloc[0] > 0:
+          base_bench = df_twr["Benchmark_Close"].iloc[0]
+          df_twr["Benchmark_Index"] = (
+              df_twr["Benchmark_Close"] / base_bench
+          ) * 100.0
 
+      # Graphique TWR
       fig_twr = go.Figure()
       fig_twr.add_trace(
           go.Scatter(
@@ -738,9 +772,9 @@ with tab_analytics:
               y=df_twr["TWR_Index"],
               mode="lines",
               name="Portefeuille",
-              line=dict(color="#3b82f6", width=2.5),
+              line=dict(color="#38bdf8", width=2.4),
               fill="tozeroy",
-              fillcolor="rgba(59, 130, 246, 0.04)",
+              fillcolor="rgba(56, 189, 248, 0.04)",
           )
       )
       if "^FCHI" in raw_prices.columns:
@@ -749,7 +783,7 @@ with tab_analytics:
                 x=df_twr["Date"],
                 y=df_twr["Benchmark_Index"],
                 mode="lines",
-                name="Benchmark CAC 40",
+                name="CAC 40",
                 line=dict(color="#64748b", width=1.5, dash="dot"),
             )
         )
@@ -759,7 +793,7 @@ with tab_analytics:
           plot_bgcolor="rgba(0,0,0,0)",
           paper_bgcolor="rgba(0,0,0,0)",
           font=dict(color="#94a3b8"),
-          margin=dict(t=20, b=20, l=10, r=10),
+          margin=dict(t=10, b=10, l=10, r=10),
           xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
           yaxis=dict(
               showgrid=True,
@@ -784,11 +818,11 @@ with tab_analytics:
             names="name",
             hole=0.6,
             color_discrete_sequence=[
-                "#3b82f6",
-                "#60a5fa",
-                "#1d4ed8",
-                "#2563eb",
-                "#93c5fd",
+                "#38bdf8",
+                "#0284c7",
+                "#0369a1",
+                "#025985",
+                "#075985",
             ],
         )
         fig_donut.update_layout(
@@ -816,7 +850,7 @@ with tab_analytics:
                 x=sorted_contrib["unrealized_pnl"],
                 y=sorted_contrib["name"],
                 orientation="h",
-                marker=dict(color=bar_colors, cornerradius=4),
+                marker=dict(color=bar_colors),
             )
         )
         fig_contrib.update_layout(
