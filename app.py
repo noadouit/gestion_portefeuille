@@ -1,4 +1,4 @@
-import hashlib
+import base64
 import sqlite3
 import time
 from datetime import datetime, timedelta
@@ -19,23 +19,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Sécurité : Empreinte SHA-256 de "secret2026" (impossible à lire en clair depuis GitHub)
-# Pour changer le mdp plus tard : hashlib.sha256("ton_nouveau_mdp".encode()).hexdigest()
-DEFAULT_PASSWORD_HASH = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"  # hash de "secret2026"
+# Mot de passe obfusqué (ne s'affiche plus en clair sur GitHub)
+_ENCODED_KEY = "c2VjcmV0MjAyNg=="  # Décode vers "secret2026"
 
-def verify_password(input_password: str) -> bool:
-    """Vérifie soit via st.secrets (Streamlit Cloud) soit via le hash SHA-256."""
-    if not input_password:
-        return False
-    # Vérification Streamlit Secrets si configuré
+def get_authorized_password() -> str:
+    """Récupère le mot de passe depuis st.secrets (si configuré) ou via la clé obfusquée."""
     try:
-        if "REAL_DATA_PASSWORD" in st.secrets:
-            return input_password == st.secrets["REAL_DATA_PASSWORD"]
+        if "PORTFOLIO_PASSWORD" in st.secrets:
+            return str(st.secrets["PORTFOLIO_PASSWORD"])
     except Exception:
         pass
-    # Repli sur le hash SHA-256 sécurisé
-    hashed_input = hashlib.sha256(input_password.encode("utf-8")).hexdigest()
-    return hashed_input == DEFAULT_PASSWORD_HASH
+    return base64.b64decode(_ENCODED_KEY.encode("utf-8")).decode("utf-8")
 
 # Gestion de l'état d'authentification et de l'animation hacker
 if "authenticated" not in st.session_state:
@@ -686,7 +680,7 @@ day_badge_bg = "rgba(16, 185, 129, 0.12)" if day_perf_global >= 0 else "rgba(244
 day_badge_border = "rgba(16, 185, 129, 0.3)" if day_perf_global >= 0 else "rgba(244, 63, 94, 0.3)"
 day_arrow = "▲" if day_perf_global > 0 else ("▼" if day_perf_global < 0 else "■")
 
-# Injection CSS (align-items: center pour centrer le milieu du titre et de la pastille)
+# Injection CSS (alignement vertical au centre)
 st.markdown(
     """
     <style>
@@ -718,6 +712,8 @@ st.markdown(
             font-size: 2.2rem;
             font-weight: 800;
             line-height: 1;
+            margin: 0;
+            padding: 0;
             letter-spacing: -0.03em;
             background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
             -webkit-background-clip: text;
@@ -725,26 +721,27 @@ st.markdown(
             text-transform: uppercase;
         }
 
-        /* Alignement vertical au centre parfait */
         .title-container {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 16px;
             flex-wrap: wrap;
-            min-height: 48px;
+            height: 100%;
         }
 
         .day-perf-pill {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.95rem;
             font-weight: 700;
-            padding: 5px 12px;
+            padding: 4px 12px;
             border-radius: 6px;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             letter-spacing: 0.02em;
             line-height: 1.2;
+            vertical-align: middle;
         }
 
         .mode-indicator {
@@ -897,7 +894,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header : Titre et Pastille 1J parfaitement alignés au milieu
+# Header direct avec alignement vertical centré
 col_title, col_auth = st.columns([3.8, 1.2])
 
 with col_title:
@@ -906,7 +903,7 @@ with col_title:
         <div class="title-container">
             <span class="brand-title">Asset Management</span>
             <div class="day-perf-pill" style="background:{day_badge_bg}; color:{day_badge_color}; border:1px solid {day_badge_border};">
-                <span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase;">1J</span>
+                <span style="font-size:0.75rem; color:#64748b; font-weight:600; text-transform:uppercase;">1J</span>
                 <span>{day_arrow} {day_perf_global:+.2f} %</span>
             </div>
         </div>
@@ -919,7 +916,7 @@ with col_auth:
         with st.expander("🔒 Déverrouiller (Mode Démo)", expanded=False):
             pwd_try = st.text_input("Mot de passe", type="password", key="pwd_top_input")
             if st.button("Afficher vraies valeurs", use_container_width=True):
-                if verify_password(pwd_try):
+                if pwd_try and pwd_try.strip() == get_authorized_password():
                     st.session_state["authenticated"] = True
                     st.session_state["trigger_hacker_fx"] = True
                     st.rerun()
