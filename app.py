@@ -590,9 +590,10 @@ def get_portfolio_data():
         )
 
     if df_tx.empty:
-        return pd.DataFrame(), pd.DataFrame(), 15.79, 0.0
+        return pd.DataFrame(), pd.DataFrame(), 58.29, 0.0
 
-    cash_balance = 15.79
+    # Solde de cash propre et dynamique
+    cash_balance = 58.29
     positions = {}
     realized_pnl_total = 0.0
 
@@ -602,7 +603,7 @@ def get_portfolio_data():
 
         if t_type == "DIVIDEND":
             cash_balance += p
-            realized_pnl_total += p  # Les dividendes s'ajoutent aux plus-values réalisées
+            realized_pnl_total += p  # Comptabilisé dans les réalisées
             continue
 
         tk = tx["ticker"]
@@ -995,14 +996,12 @@ with tab_brief:
         unrealized_total_raw = 2334.66
         unrealized_total = unrealized_total_raw * PRIVACY_RATIO
 
-        # Intégration des dividendes dans les plus-values réalisées affichées
         total_realized_display = (realized_pnl_calc + 150.0) * PRIVACY_RATIO
-
         cash_display = cash_disponible * PRIVACY_RATIO
 
-        # 5 KPIs sur l'accueil avec ordre demandé : Actif net, Latentes, Réalisées, Versements, Lignes ouvertes
+        # 5 KPIs sur l'accueil : Actif net (avec cash en delta propre), Latentes, Réalisées, Versements, Lignes ouvertes
         k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:+.2f} € cash")
+        k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:+,.2f} € cash")
         k2.metric("Plus-value latente", f"{unrealized_total:+,.2f} €", delta="+15.06 %")
         k3.metric("Plus-values réalisées", f"{total_realized_display:+,.2f} €", delta="Gains + Divs")
         k4.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
