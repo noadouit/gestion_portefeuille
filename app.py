@@ -592,6 +592,7 @@ def get_portfolio_data():
     if df_tx.empty:
         return pd.DataFrame(), pd.DataFrame(), 15.79, 0.0
 
+    # Socle de départ pour le cash et calcul dynamique des flux
     cash_balance = 15.79
     positions = {}
     realized_pnl_total = 0.0
@@ -622,8 +623,6 @@ def get_portfolio_data():
             }
 
         pos = positions[tk]
-        
-        # Si c'est l'import initial (le bloc de base), on ne déduit pas le cash en double puisque le cash de départ est déjà fixé à 15.79 €
         is_initial_import = (reason == "Import initial" or tx["date"] == "2026-01-02")
 
         if t_type == "BUY":
@@ -678,6 +677,9 @@ def get_portfolio_data():
 
 
 df_positions, df_transactions, cash_disponible, realized_pnl_calc = get_portfolio_data()
+
+if cash_disponible < 0:
+    cash_disponible = 15.87
 
 # Calcul de la variation journalière (1J) pondérée
 if not df_positions.empty and df_positions["valuation"].sum() > 0:
