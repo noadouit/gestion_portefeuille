@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System Épuré
+# Design System & Neutralisation stricte des effets de survol Streamlit
 st.markdown(
     """
     <style>
@@ -54,30 +54,48 @@ st.markdown(
             align-items: center;
         }
 
-        /* Suppression stricte des effets de survol moches */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 4px;
-            background-color: transparent;
-            border-bottom: 1px solid #1a2337;
-            padding-bottom: 0px;
-            margin-bottom: 2rem;
+        /* NEUTRALISATION ABSOLUE DU SURVOL DES ONGLETS */
+        div[data-baseweb="tab-list"] {
+            gap: 12px !important;
+            background-color: transparent !important;
+            border-bottom: 1px solid #1a2337 !important;
+            padding-bottom: 0px !important;
+            margin-bottom: 2rem !important;
         }
 
-        .stTabs [data-baseweb="tab"] {
-            padding: 8px 16px;
+        div[data-baseweb="tab-list"] button,
+        div[data-baseweb="tab"] {
+            background: transparent !important;
             background-color: transparent !important;
             border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
             color: #64748b !important;
-            font-size: 0.9rem;
-            font-weight: 500;
+            font-size: 0.92rem !important;
+            font-weight: 500 !important;
+            padding: 10px 14px !important;
+            transition: color 0.15s ease !important;
         }
 
-        .stTabs [data-baseweb="tab"]:hover {
-            color: #cbd5e1 !important;
+        /* Aucun changement de fond au passage de la souris */
+        div[data-baseweb="tab-list"] button:hover,
+        div[data-baseweb="tab"]:hover,
+        div[data-baseweb="tab-list"] button:focus,
+        div[data-baseweb="tab"]:focus,
+        div[data-baseweb="tab-list"] button:active,
+        div[data-baseweb="tab"]:active {
+            background: transparent !important;
             background-color: transparent !important;
+            color: #e2e8f0 !important;
+            box-shadow: none !important;
+            border: none !important;
         }
 
-        .stTabs [aria-selected="true"] {
+        /* Onglet sélectionné : simple soulignement cyan élégant */
+        div[data-baseweb="tab-list"] button[aria-selected="true"],
+        div[data-baseweb="tab"][aria-selected="true"] {
+            background: transparent !important;
+            background-color: transparent !important;
             color: #38bdf8 !important;
             font-weight: 600 !important;
             border-bottom: 2px solid #38bdf8 !important;
@@ -107,7 +125,6 @@ st.markdown(
         .news-item {
             padding: 12px 16px;
             border-bottom: 1px solid #1a2337;
-            transition: background 0.1s ease;
         }
         .news-item:last-child { border-bottom: none; }
     </style>
@@ -147,10 +164,35 @@ def init_db():
                 notes TEXT,
                 FOREIGN KEY (asset_id) REFERENCES assets(id)
             );
+            CREATE TABLE IF NOT EXISTS price_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                price REAL NOT NULL,
+                UNIQUE(ticker, timestamp)
+            );
         """)
 
 
 init_db()
+
+
+def record_hourly_prices(live_quotes):
+  """Enregistre le cours de chaque actif toutes les heures en base SQLite."""
+  current_slot = datetime.now().strftime("%Y-%m-%d %H:00:00")
+  with get_connection() as conn:
+    cur = conn.cursor()
+    for tk, data in live_quotes.items():
+      price = data.get("price", 0.0)
+      if price > 0:
+        cur.execute(
+            """
+                    INSERT OR IGNORE INTO price_history (ticker, timestamp, price)
+                    VALUES (?, ?, ?)
+                """,
+            (tk, current_slot, price),
+        )
+    conn.commit()
 
 
 def get_french_date():
@@ -318,6 +360,9 @@ def get_portfolio_data():
   df_pos = pd.DataFrame(active)
   live = fetch_live_quotes(df_pos["ticker"].tolist())
 
+  # Déclenchement automatique de la capture horaire
+  record_hourly_prices(live)
+
   df_pos["pru"] = df_pos["total_cost"] / df_pos["quantity"]
   df_pos["current_price"] = df_pos["ticker"].map(
       lambda x: live.get(x, {}).get("price", 0.0)
@@ -349,7 +394,7 @@ def get_portfolio_data():
 
 df_positions, df_transactions = get_portfolio_data()
 
-# Navigation principale
+# Navigation
 tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
     "Marchés & Synthèse",
     "Portefeuille & Ordres",
@@ -530,9 +575,6 @@ with tab_brief:
       else:
         st.caption("Données de multiples indisponibles.")
 
-    # ----------------------------------------------------
-    # BANDEAU D'ACTUALITÉS EN DIRECT
-    # ----------------------------------------------------
     st.write("")
     st.markdown("#### Actualités des entreprises en portefeuille")
     active_tickers = df_positions["ticker"].tolist()
@@ -715,7 +757,7 @@ with tab_holdings:
       )
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE & TWR (EN POURCENTAGE %)
+# ONGLET 3 : PERFORMANCE & TWR (AVEC INTÉGRATION HORAIRE)
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
@@ -745,8 +787,8 @@ with tab_analytics:
     now_date = datetime.now()
 
     period_deltas = {
-        "1J": timedelta(days=2),
-        "5J": timedelta(days=7),
+        "1J": timedelta(days=1),
+        "5J": timedelta(days=5),
         "1M": timedelta(days=30),
         "3M": timedelta(days=90),
         "6M": timedelta(days=180),
@@ -763,34 +805,50 @@ with tab_analytics:
       query_start_date = max(first_tx_date - timedelta(days=5), calculated_start)
 
     tickers_list = df_transactions["ticker"].unique().tolist()
+    use_hourly = selected_period in ["1J", "5J"]
 
     with st.spinner("Calcul de la rentabilité financière..."):
       tickers_with_bench = tickers_list + ["^FCHI"]
+      interval = "60m" if use_hourly else "1d"
+
       raw_prices = yf.download(
-          tickers_with_bench, start=query_start_date, progress=False
+          tickers_with_bench,
+          start=query_start_date,
+          interval=interval,
+          progress=False,
       )["Close"]
       if isinstance(raw_prices, pd.Series):
         raw_prices = raw_prices.to_frame(name=tickers_with_bench[0])
       raw_prices = raw_prices.ffill().bfill()
 
-      trading_days = [d for d in raw_prices.index if d >= query_start_date]
+      # Conversion timezone pour alignement
+      if hasattr(raw_prices.index, "tz") and raw_prices.index.tz is not None:
+        raw_prices.index = raw_prices.index.tz_convert(None)
+
+      trading_points = [
+          pt for pt in raw_prices.index if pt >= pd.to_datetime(query_start_date)
+      ]
 
       twr_records = []
       cumulative_twr = 1.0
       prev_portfolio_val = 0.0
 
-      for i, d in enumerate(trading_days):
-        day_str = d.strftime("%Y-%m-%d")
-        day_tx = df_transactions[df_transactions["date"] == day_str]
+      for i, pt in enumerate(trading_points):
+        pt_date_str = pt.strftime("%Y-%m-%d")
+
+        # Inflow / Outflow à la date du point
+        day_tx = df_transactions[df_transactions["date"] == pt_date_str]
         inflow = 0.0
-        if not day_tx.empty:
+        if not day_tx.empty and (
+            not use_hourly or pt.hour == 9
+        ):  # Compté en début de séance
           for _, r in day_tx.iterrows():
             if r["type"] == "BUY":
               inflow += (r["quantity"] * r["price"]) + r["fees"]
             elif r["type"] == "SELL":
               inflow -= (r["quantity"] * r["price"]) - r["fees"]
 
-        sub_tx = df_transactions[pd.to_datetime(df_transactions["date"]) <= d]
+        sub_tx = df_transactions[pd.to_datetime(df_transactions["date"]) <= pt]
         end_val = 0.0
         for tk in tickers_list:
           tx_tk = sub_tx[sub_tx["ticker"] == tk]
@@ -798,7 +856,7 @@ with tab_analytics:
               tx_tk["type"] == "SELL"
           ]["quantity"].sum()
           if q > 0 and tk in raw_prices.columns:
-            px_val = raw_prices.loc[d, tk]
+            px_val = raw_prices.loc[pt, tk]
             if pd.notnull(px_val):
               end_val += q * float(px_val)
 
@@ -815,18 +873,19 @@ with tab_analytics:
         prev_portfolio_val = end_val
 
         bench_close = (
-            raw_prices.loc[d, "^FCHI"] if "^FCHI" in raw_prices.columns else 1.0
+            raw_prices.loc[pt, "^FCHI"]
+            if "^FCHI" in raw_prices.columns
+            else 1.0
         )
 
         twr_records.append({
-            "Date": d,
+            "Date": pt,
             "TWR_Raw": cumulative_twr,
             "Benchmark_Close": bench_close,
         })
 
       df_twr = pd.DataFrame(twr_records)
 
-      # Calcul de la performance en % net par rapport au début de période
       if not df_twr.empty:
         base_twr = df_twr["TWR_Raw"].iloc[0]
         df_twr["Portfolio_Return_Pct"] = (
@@ -839,11 +898,10 @@ with tab_analytics:
               (df_twr["Benchmark_Close"] / base_bench) - 1.0
           ) * 100.0
 
-      # Graphique en %
       st.markdown("#### Performance cumulée (%)")
       st.caption(
-          "Rendement pondéré dans le temps (TWR) neutralisant les flux"
-          " d'apports et de retraits."
+          "Méthode TWR (Time-Weighted Return) neutralisant les apports et"
+          " retraits de trésorerie."
       )
 
       fig_twr = go.Figure()
@@ -867,7 +925,6 @@ with tab_analytics:
             )
         )
 
-      # Ligne zéro repère
       fig_twr.add_hline(
           y=0, line_dash="solid", line_color="rgba(255,255,255,0.15)", line_width=1
       )
