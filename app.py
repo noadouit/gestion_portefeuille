@@ -21,6 +21,9 @@ st.set_page_config(
 # Mot de passe
 REAL_DATA_PASSWORD = "secret2026"
 
+# Plus-values réalisées : valeur de départ, ensuite modifiée uniquement par les ventes
+REALIZED_PNL_INITIAL = 1492.56
+
 # Gestion de l'état d'authentification et de l'animation hacker
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -590,20 +593,20 @@ def get_portfolio_data():
         )
 
     if df_tx.empty:
-        return pd.DataFrame(), pd.DataFrame(), 15.79, 1492.56
+        return pd.DataFrame(), pd.DataFrame(), 15.79, 0.0
 
     cash_balance = 15.79
     positions = {}
-    realized_pnl_total = 1492.56  # Base demandée pour les plus-values réalisées
+    realized_pnl_total = 0.0  # uniquement alimenté par les VENTES
 
     for _, tx in df_tx.iterrows():
         t_type = tx["type"]
         q, p, f = float(tx["quantity"] or 0), float(tx["price"] or 0), float(tx["fees"] or 0)
-        reason = tx["reason"] or ""
+        notes = tx["notes"] or ""
 
+        # Dividende : impacte uniquement le cash (pas les plus-values réalisées)
         if t_type == "DIVIDEND":
             cash_balance += p
-            # Les dividendes n'impactent pas les plus-values réalisées
             continue
 
         tk = tx["ticker"]
@@ -622,22 +625,25 @@ def get_portfolio_data():
             }
 
         pos = positions[tk]
-        is_initial_import = (reason == "Import initial" or tx["date"] == "2026-01-02")
+
+        # L'import initial n'impacte pas le cash (le cash de départ est déjà fixé à 15.79 €)
+        is_initial_import = (notes == "Import initial")
 
         if t_type == "BUY":
             pos["total_cost"] += (q * p) + f
             pos["quantity"] += q
             if not is_initial_import:
                 cash_balance -= (q * p) + f
+
         elif t_type == "SELL":
             if pos["quantity"] > 0:
                 avg_cost = pos["total_cost"] / pos["quantity"]
                 trade_pnl = (p - avg_cost) * q - f
                 pos["realized_pnl"] += trade_pnl
-                realized_pnl_total += trade_pnl  # Seules les ventes impactent les PV réalisées
+                realized_pnl_total += trade_pnl
                 pos["quantity"] -= q
                 pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
-                cash_balance += (q * p) - f
+            cash_balance += (q * p) - f
 
     active = [p for p in positions.values() if p["quantity"] > 0.0001]
     if not active:
@@ -676,9 +682,6 @@ def get_portfolio_data():
 
 
 df_positions, df_transactions, cash_disponible, realized_pnl_calc = get_portfolio_data()
-
-if cash_disponible < 0:
-    cash_disponible = 15.87
 
 # Calcul de la variation journalière (1J) pondérée
 if not df_positions.empty and df_positions["valuation"].sum() > 0:
@@ -1002,14 +1005,14 @@ with tab_brief:
         unrealized_total_raw = 2334.66
         unrealized_total = unrealized_total_raw * PRIVACY_RATIO
 
-        total_realized_display = realized_pnl_calc * PRIVACY_RATIO
+        total_realized_display = (REALIZED_PNL_INITIAL + realized_pnl_calc) * PRIVACY_RATIO
         cash_display = cash_disponible * PRIVACY_RATIO
 
-        # 5 KPIs sur l'accueil
+        # 5 KPIs sur l'accueil : Actif net (avec delta cash propre), Latentes, Réalisées, Versements, Lignes ouvertes
         k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:+,.2f} € cash")
         k2.metric("Plus-value latente", f"{unrealized_total:+,.2f} €", delta="+15.06 %")
-        k3.metric("Plus-values réalisées", f"{total_realized_display:+,.2f} €", delta="Gains sur ventes")
+        k3.metric("Plus-values réalisées", f"{total_realized_display:+,.2f} €", delta="Ventes uniquement")
         k4.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
         k5.metric("Lignes ouvertes", f"{len(df_positions):02d}", f"{df_positions['sector'].nunique()} secteurs")
 
@@ -1087,27 +1090,26 @@ with tab_brief:
             recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
             for _, tx in recent_tx.iterrows():
                 if tx["type"] == "DIVIDEND":
-                    badge_bg = "rgba(56, 189, 248, 0.15)"
-                    badge_color = "#38bdf8"
-                    badge_lbl = "DIVIDENDE"
-                    qty_display = 0.0
-                else:
-                    badge_bg = "rgba(16, 185, 129, 0.15)" if tx["type"] == "BUY" else "rgba(244, 63, 94, 0.15)"
-                    badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
-                    badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
-                    qty_display = tx['quantity'] * PRIVACY_RATIO
-
+                    continue
+                badge_bg = (
+                    "rgba(16, 185, 129, 0.15)"
+                    if tx["type"] == "BUY"
+                    else "rgba(244, 63, 94, 0.15)"
+                )
+                badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
+                badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
+                qty_display = tx['quantity'] * PRIVACY_RATIO
                 st.markdown(
                     f"""<div class="glass-card" style="padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="background:{badge_bg}; color:{badge_color}; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:4px;">{badge_lbl}</span>
-                        <span style="font-size:0.88rem; font-weight:600; color:#f1f5f9;">{tx['name'] or 'Versement Cash'}</span>
+                        <span style="font-size:0.88rem; font-weight:600; color:#f1f5f9;">{tx['name']}</span>
                     </div>
-                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Opération'}</div>
+                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Consolidation de ligne'}</div>
                 </div>
                 <div class="mono" style="text-align:right;">
-                    <div style="font-size:0.82rem; font-weight:600; color:#ffffff;">{f"{qty_display:.2f} × {tx['price']:.2f} €" if tx['type'] != 'DIVIDEND' else f"+{tx['price']:.2f} €"}</div>
+                    <div style="font-size:0.82rem; font-weight:600; color:#ffffff;">{qty_display:.2f} × {tx['price']:.2f} €</div>
                     <div style="font-size:0.7rem; color:#64748b;">{tx['date']}</div>
                 </div>
             </div>""",
@@ -1146,31 +1148,41 @@ with tab_holdings:
 
     with col_saisie:
         st.markdown("#### Nouvel ordre ou dividende")
-        
-        with st.form("tx_entry_form", clear_on_submit=True):
-            op_type = st.selectbox(
-                "Sens de l'opération", ["Achat", "Vente", "Dividende"]
+
+        # Sélecteur HORS formulaire pour que l'affichage change immédiatement
+        op_type = st.selectbox(
+            "Sens de l'opération",
+            ["Achat", "Vente", "Dividende"],
+            key="op_type_select",
+        )
+
+        # La recherche d'actif n'est utile que pour un achat / une vente
+        selected_asset = None
+        if op_type != "Dividende":
+            search_input = st.text_input(
+                "Rechercher un actif",
+                placeholder="Nom ou ticker...",
             )
+            search_results = search_yahoo(search_input)
+
+            if search_results:
+                options = {
+                    f"{item['name']} ({item['ticker']})": item for item in search_results
+                }
+                picked_label = st.selectbox(
+                    "Valeur sélectionnée", list(options.keys()), index=0
+                )
+                selected_asset = options[picked_label]
+
+        # Clé du formulaire dépendante du type : chaque mode a son propre état
+        with st.form(f"tx_entry_form_{op_type}", clear_on_submit=True):
             op_date = st.date_input("Date d'exécution", value=datetime.today())
 
-            selected_asset = None
-            if op_type != "Dividende":
-                search_input = st.text_input(
-                    "Rechercher un actif",
-                    placeholder="Nom ou ticker...",
-                )
-                search_results = search_yahoo(search_input)
-                if search_results:
-                    options = {
-                        f"{item['name']} ({item['ticker']})": item for item in search_results
-                    }
-                    picked_label = st.selectbox(
-                        "Valeur sélectionnée", list(options.keys()), index=0
-                    )
-                    selected_asset = options[picked_label]
-
             if op_type == "Dividende":
-                div_amount = st.number_input("Montant total du dividende perçu (€)", min_value=0.01, value=50.0, step=1.0)
+                div_amount = st.number_input(
+                    "Montant du dividende perçu (€)",
+                    min_value=0.01, value=50.0, step=1.0,
+                )
                 reason_div = st.text_input("Source / Notes", value="Versement dividende")
             else:
                 c_q, c_p = st.columns(2)
@@ -1178,7 +1190,7 @@ with tab_holdings:
                     "Quantité", min_value=0.0001, value=1.0, step=1.0
                 )
                 price = c_p.number_input(
-                    "Prix unitaire (€)", min_value=0.0001, value=100.0, step=0.1
+                    "Prix unitaire / PRU (€)", min_value=0.0001, value=100.0, step=0.1
                 )
 
                 c_f, c_fx = st.columns(2)
@@ -1201,21 +1213,40 @@ with tab_holdings:
             )
 
             if submit:
+                success = False
                 with get_connection() as conn:
                     cur = conn.cursor()
+
                     if op_type == "Dividende":
                         cur.execute(
                             """
                             INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
                             VALUES (NULL, 'DIVIDEND', ?, 0.0, ?, 0.0, 1.0, 'Dividende perçu', ?)
-                        """,
+                            """,
                             (op_date.strftime("%Y-%m-%d"), div_amount, reason_div),
                         )
                         conn.commit()
-                        st.success(f"Dividende de {div_amount} € perçu et ajouté au cash !")
+                        st.toast(f"Dividende de {div_amount:,.2f} € ajouté au cash.")
+                        success = True
+
+                    elif not selected_asset:
+                        st.error("Sélectionnez une valeur avant de valider.")
+
                     else:
-                        if not selected_asset:
-                            st.error("Sélectionnez une valeur avant de valider.")
+                        # Vérification : on ne peut pas vendre plus que ce qu'on détient
+                        held = 0.0
+                        if not df_positions.empty:
+                            held = float(
+                                df_positions.loc[
+                                    df_positions["ticker"] == selected_asset["ticker"],
+                                    "quantity",
+                                ].sum()
+                            )
+
+                        if op_type == "Vente" and quantity > held + 1e-9:
+                            st.error(
+                                f"Vente impossible : vous détenez {held:.2f} titre(s) seulement."
+                            )
                         else:
                             type_code = "BUY" if op_type == "Achat" else "SELL"
                             cur.execute(
@@ -1223,7 +1254,7 @@ with tab_holdings:
                                 INSERT INTO assets (ticker, name, sector)
                                 VALUES (?, ?, ?)
                                 ON CONFLICT(ticker) DO UPDATE SET name=excluded.name, sector=excluded.sector
-                            """,
+                                """,
                                 (
                                     selected_asset["ticker"],
                                     selected_asset["name"],
@@ -1240,7 +1271,7 @@ with tab_holdings:
                                 """
                                 INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
+                                """,
                                 (
                                     asset_id,
                                     type_code,
@@ -1254,8 +1285,11 @@ with tab_holdings:
                                 ),
                             )
                             conn.commit()
-                            st.success(f"Opération enregistrée pour {selected_asset['name']}.")
-                st.rerun()
+                            st.toast(f"Opération enregistrée pour {selected_asset['name']}.")
+                            success = True
+
+                if success:
+                    st.rerun()
 
     with col_table:
         st.markdown("#### Positions ouvertes")
