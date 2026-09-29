@@ -20,29 +20,11 @@ st.set_page_config(
 # Mot de passe pour afficher les vrais montants
 REAL_DATA_PASSWORD = "secret2026"
 
-# Gestion du mode privé / démo
+# Gestion de l'état d'authentification
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-
-# Sidebar pour le déverrouillage
-with st.sidebar:
-    st.markdown("### Confidentialité")
-    if not st.session_state["authenticated"]:
-        pwd_input = st.text_input("Code d'accès portefeuille :", type="password")
-        if st.button("Afficher les vraies valeurs", use_container_width=True):
-            if pwd_input == REAL_DATA_PASSWORD:
-                st.session_state["authenticated"] = True
-                st.rerun()
-            else:
-                st.error("Mot de passe incorrect")
-    else:
-        st.success("Mode Réel Actif")
-        if st.button("Masquer (Mode Démo)", use_container_width=True):
-            st.session_state["authenticated"] = False
-            st.rerun()
+  st.session_state["authenticated"] = False
 
 is_real_mode = st.session_state["authenticated"]
-# En mode faux chiffres, on applique un facteur d'échelle (ex: 0.25 pour afficher ~4 400 € au lieu de 17 800 €)
 PRIVACY_RATIO = 1.0 if is_real_mode else 0.25
 
 # Design System
@@ -58,7 +40,7 @@ st.markdown(
         }
 
         .block-container {
-            padding-top: 4.2rem !important;
+            padding-top: 3.5rem !important;
             padding-bottom: 2.5rem !important;
             max-width: 1540px;
         }
@@ -70,15 +52,6 @@ st.markdown(
 
         .mono {
             font-family: 'JetBrains Mono', monospace;
-        }
-
-        .brand-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 2rem;
-            padding-bottom: 0.8rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .brand-title {
@@ -94,7 +67,7 @@ st.markdown(
 
         .mode-indicator {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 700;
             padding: 4px 10px;
             border-radius: 4px;
@@ -242,17 +215,39 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header avec badge d'état
-badge_class = "mode-real" if is_real_mode else "mode-demo"
-badge_text = "VALEURS RÉELLES" if is_real_mode else "DÉMO / MASQUÉ"
+# Header direct avec bouton de confidentialité visible
+col_title, col_auth = st.columns([3.5, 1.5])
+
+with col_title:
+  st.markdown(
+      '<span class="brand-title">Asset Management</span>',
+      unsafe_allow_html=True,
+  )
+
+with col_auth:
+  if not is_real_mode:
+    with st.expander("🔒 Déverrouiller (Mode Démo)", expanded=False):
+      pwd_try = st.text_input(
+          "Mot de passe", type="password", key="pwd_top_input"
+      )
+      if st.button("Afficher vraies valeurs", use_container_width=True):
+        if pwd_try == REAL_DATA_PASSWORD:
+          st.session_state["authenticated"] = True
+          st.rerun()
+        else:
+          st.error("Mot de passe incorrect")
+  else:
+    st.markdown(
+        '<span class="mode-indicator mode-real">VALEURS RÉELLES</span>',
+        unsafe_allow_html=True,
+    )
+    if st.button("Masquer (Mode Démo)", use_container_width=True):
+      st.session_state["authenticated"] = False
+      st.rerun()
 
 st.markdown(
-    f"""
-    <div class="brand-header">
-        <span class="brand-title">Asset Management</span>
-        <span class="mode-indicator {badge_class}">{badge_text}</span>
-    </div>
-""",
+    '<div style="margin-bottom: 1.5rem; border-bottom: 1px solid'
+    ' rgba(255,255,255,0.05);"></div>',
     unsafe_allow_html=True,
 )
 
@@ -466,15 +461,14 @@ DEFAULT_DIV_YIELDS = {
 
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+  conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+  conn.row_factory = sqlite3.Row
+  return conn
 
 
 def init_db():
-    with get_connection() as conn:
-        conn.executescript(
-            """
+  with get_connection() as conn:
+    conn.executescript("""
             CREATE TABLE IF NOT EXISTS assets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker TEXT NOT NULL UNIQUE,
@@ -495,255 +489,264 @@ def init_db():
                 notes TEXT,
                 FOREIGN KEY (asset_id) REFERENCES assets(id)
             );
-        """
-        )
+        """)
 
-        cur = conn.cursor()
-        cur.execute("SELECT count(*) FROM assets")
-        if cur.fetchone()[0] < 5:
-            holdings_data = [
-                ("TEP.PA", "TELEPERFORMANCE", "Services Numériques", 36.0, 52.13),
-                ("VIL.PA", "VIEL & COMPAGNIE", "Services Financiers", 122.0, 17.32),
-                ("PUB.PA", "PUBLICIS GROUPE", "Communication", 23.0, 77.82),
-                ("EDEN.PA", "EDENRED", "Moyens de paiement", 76.0, 18.45),
-                ("CAP.PA", "CAPGEMINI", "Technologies & Conseil", 20.0, 102.22),
-                ("IPS.PA", "IPSOS", "Études & Médias", 50.0, 30.53),
-                ("SAN.PA", "SANOFI", "Santé & Pharma", 22.0, 73.81),
-                ("SOP.PA", "SOPRA STERIA", "Technologies", 8.0, 135.71),
-                ("ALGIL.PA", "GROUPE GUILLIN", "Emballages & Industrie", 49.0, 21.31),
-                ("FGR.PA", "EIFFAGE", "Construction & Concessions", 9.0, 110.38),
-            ]
-            cur.execute("DELETE FROM transactions")
-            cur.execute("DELETE FROM assets")
+    cur = conn.cursor()
+    cur.execute("SELECT count(*) FROM assets")
+    if cur.fetchone()[0] < 5:
+      holdings_data = [
+          ("TEP.PA", "TELEPERFORMANCE", "Services Numériques", 36.0, 52.13),
+          ("VIL.PA", "VIEL & COMPAGNIE", "Services Financiers", 122.0, 17.32),
+          ("PUB.PA", "PUBLICIS GROUPE", "Communication", 23.0, 77.82),
+          ("EDEN.PA", "EDENRED", "Moyens de paiement", 76.0, 18.45),
+          ("CAP.PA", "CAPGEMINI", "Technologies & Conseil", 20.0, 102.22),
+          ("IPS.PA", "IPSOS", "Études & Médias", 50.0, 30.53),
+          ("SAN.PA", "SANOFI", "Santé & Pharma", 22.0, 73.81),
+          ("SOP.PA", "SOPRA STERIA", "Technologies", 8.0, 135.71),
+          ("ALGIL.PA", "GROUPE GUILLIN", "Emballages & Industrie", 49.0, 21.31),
+          ("FGR.PA", "EIFFAGE", "Construction & Concessions", 9.0, 110.38),
+      ]
+      cur.execute("DELETE FROM transactions")
+      cur.execute("DELETE FROM assets")
 
-            for tk, nm, sec, q, pru in holdings_data:
-                cur.execute(
-                    """
+      for tk, nm, sec, q, pru in holdings_data:
+        cur.execute(
+            """
                     INSERT INTO assets (ticker, name, sector)
                     VALUES (?, ?, ?)
                 """,
-                    (tk, nm, sec),
-                )
-                aid = cur.lastrowid
-                cur.execute(
-                    """
+            (tk, nm, sec),
+        )
+        aid = cur.lastrowid
+        cur.execute(
+            """
                     INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
                     VALUES (?, 'BUY', '2026-01-02', ?, ?, 0.0, 1.0, 'Position consolidée', 'Import initial')
                 """,
-                    (aid, q, pru),
-                )
-            conn.commit()
+            (aid, q, pru),
+        )
+      conn.commit()
 
 
 init_db()
 
 
 def get_french_date():
-    mois = [
-        "janvier", "février", "mars", "avril", "mai", "juin",
-        "juillet", "août", "septembre", "octobre", "novembre", "décembre"
-    ]
-    now = datetime.now()
-    return f"{now.day} {mois[now.month - 1]} {now.year}"
+  mois = [
+      "janvier",
+      "février",
+      "mars",
+      "avril",
+      "mai",
+      "juin",
+      "juillet",
+      "août",
+      "septembre",
+      "octobre",
+      "novembre",
+      "décembre",
+  ]
+  now = datetime.now()
+  return f"{now.day} {mois[now.month - 1]} {now.year}"
 
 
 @st.cache_data(ttl=900)
 def get_market_indices():
-    indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^TNX": "US 10Y Bond"}
-    out = {}
-    for symbol, name in indices.items():
-        try:
-            tk = yf.Ticker(symbol)
-            hist = tk.history(period="5d")
-            if len(hist) >= 2:
-                c = hist["Close"].iloc[-1]
-                p = hist["Close"].iloc[-2]
-                chg = ((c - p) / p) * 100
-                out[name] = {"price": c, "change": chg}
-            else:
-                out[name] = {"price": 0.0, "change": 0.0}
-        except Exception:
-            out[name] = {"price": 0.0, "change": 0.0}
-    return out
+  indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^TNX": "US 10Y Bond"}
+  out = {}
+  for symbol, name in indices.items():
+    try:
+      tk = yf.Ticker(symbol)
+      hist = tk.history(period="5d")
+      if len(hist) >= 2:
+        c = hist["Close"].iloc[-1]
+        p = hist["Close"].iloc[-2]
+        chg = ((c - p) / p) * 100
+        out[name] = {"price": c, "change": chg}
+      else:
+        out[name] = {"price": 0.0, "change": 0.0}
+    except Exception:
+      out[name] = {"price": 0.0, "change": 0.0}
+  return out
 
 
 @st.cache_data(ttl=900)
 def get_portfolio_news_rss(tickers):
-    news = []
-    headers = {"User-Agent": "Mozilla/5.0"}
-    for tk in tickers:
-        url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={tk}&region=FR&lang=fr-FR"
-        try:
-            resp = requests.get(url, headers=headers, timeout=4)
-            if resp.status_code == 200:
-                root = ET.fromstring(resp.content)
-                items = root.findall("./channel/item")
-                for it in items[:3]:
-                    title = it.findtext("title", "")
-                    link = it.findtext("link", "")
-                    pub_date_raw = it.findtext("pubDate", "")
+  news = []
+  headers = {"User-Agent": "Mozilla/5.0"}
+  for tk in tickers:
+    url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={tk}&region=FR&lang=fr-FR"
+    try:
+      resp = requests.get(url, headers=headers, timeout=4)
+      if resp.status_code == 200:
+        root = ET.fromstring(resp.content)
+        items = root.findall("./channel/item")
+        for it in items[:3]:
+          title = it.findtext("title", "")
+          link = it.findtext("link", "")
+          pub_date_raw = it.findtext("pubDate", "")
 
-                    parsed_timestamp = 0
-                    display_date = ""
-                    if pub_date_raw:
-                        try:
-                            parsed_dt = email.utils.parsedate_to_datetime(pub_date_raw)
-                            parsed_timestamp = parsed_dt.timestamp()
-                            display_date = parsed_dt.strftime("%d/%m %H:%M")
-                        except Exception:
-                            display_date = pub_date_raw[:16]
+          parsed_timestamp = 0
+          display_date = ""
+          if pub_date_raw:
+            try:
+              parsed_dt = email.utils.parsedate_to_datetime(pub_date_raw)
+              parsed_timestamp = parsed_dt.timestamp()
+              display_date = parsed_dt.strftime("%d/%m %H:%M")
+            except Exception:
+              display_date = pub_date_raw[:16]
 
-                    if title and link:
-                        news.append({
-                            "ticker": tk,
-                            "title": title,
-                            "link": link,
-                            "pubDate": display_date,
-                            "timestamp": parsed_timestamp,
-                        })
-        except Exception:
-            continue
+          if title and link:
+            news.append({
+                "ticker": tk,
+                "title": title,
+                "link": link,
+                "pubDate": display_date,
+                "timestamp": parsed_timestamp,
+            })
+    except Exception:
+      continue
 
-    news.sort(key=lambda x: x["timestamp"], reverse=True)
-    return news[:10]
+  news.sort(key=lambda x: x["timestamp"], reverse=True)
+  return news[:10]
 
 
 def search_yahoo(query):
-    if not query or len(query) < 2:
-        return []
-    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=6&newsCount=0"
-    try:
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
-        data = res.json()
-        items = []
-        for q in data.get("quotes", []):
-            if q.get("quoteType") in ["EQUITY", "ETF"]:
-                items.append({
-                    "ticker": q.get("symbol"),
-                    "name": q.get("longname") or q.get("shortname") or q.get("symbol"),
-                    "sector": q.get("sector") or "Industrie & Services",
-                })
-        return items
-    except Exception:
-        return []
+  if not query or len(query) < 2:
+    return []
+  url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=6&newsCount=0"
+  try:
+    res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+    data = res.json()
+    items = []
+    for q in data.get("quotes", []):
+      if q.get("quoteType") in ["EQUITY", "ETF"]:
+        items.append({
+            "ticker": q.get("symbol"),
+            "name": q.get("longname") or q.get("shortname") or q.get("symbol"),
+            "sector": q.get("sector") or "Industrie & Services",
+        })
+    return items
+  except Exception:
+    return []
 
 
 def fetch_live_quotes(tickers):
-    quotes = {}
-    for t in tickers:
-        try:
-            tk = yf.Ticker(t)
-            info = tk.info
-            p = (
-                info.get("currentPrice")
-                or info.get("regularMarketPrice")
-                or info.get("previousClose")
-                or 0.0
-            )
+  quotes = {}
+  for t in tickers:
+    try:
+      tk = yf.Ticker(t)
+      info = tk.info
+      p = (
+          info.get("currentPrice")
+          or info.get("regularMarketPrice")
+          or info.get("previousClose")
+          or 0.0
+      )
 
-            div_val = info.get("dividendYield")
-            if div_val is not None and 0 < float(div_val) <= 0.20:
-                clean_yield = float(div_val) * 100.0
-            elif div_val is not None and 0.20 < float(div_val) <= 15.0:
-                clean_yield = float(div_val)
-            else:
-                clean_yield = DEFAULT_DIV_YIELDS.get(t, 3.8)
+      div_val = info.get("dividendYield")
+      if div_val is not None and 0 < float(div_val) <= 0.20:
+        clean_yield = float(div_val) * 100.0
+      elif div_val is not None and 0.20 < float(div_val) <= 15.0:
+        clean_yield = float(div_val)
+      else:
+        clean_yield = DEFAULT_DIV_YIELDS.get(t, 3.8)
 
-            quotes[t] = {
-                "price": float(p),
-                "pe": info.get("trailingPE"),
-                "yield": clean_yield,
-                "sector": info.get("sector") or "Industrie & Services",
-                "day_change": info.get("regularMarketChangePercent", 0.0),
-            }
-        except Exception:
-            quotes[t] = {
-                "price": 0.0,
-                "pe": None,
-                "yield": DEFAULT_DIV_YIELDS.get(t, 3.8),
-                "sector": "Industrie & Services",
-                "day_change": 0.0,
-            }
-    return quotes
+      quotes[t] = {
+          "price": float(p),
+          "pe": info.get("trailingPE"),
+          "yield": clean_yield,
+          "sector": info.get("sector") or "Industrie & Services",
+          "day_change": info.get("regularMarketChangePercent", 0.0),
+      }
+    except Exception:
+      quotes[t] = {
+          "price": 0.0,
+          "pe": None,
+          "yield": DEFAULT_DIV_YIELDS.get(t, 3.8),
+          "sector": "Industrie & Services",
+          "day_change": 0.0,
+      }
+  return quotes
 
 
 def get_portfolio_data():
-    with get_connection() as conn:
-        df_tx = pd.read_sql_query(
-            """
+  with get_connection() as conn:
+    df_tx = pd.read_sql_query(
+        """
             SELECT t.id, t.asset_id, t.type, t.date, t.quantity, t.price, t.fees, t.exchange_rate, 
                    t.reason, t.notes, a.ticker, a.name, a.sector
             FROM transactions t
             JOIN assets a ON t.asset_id = a.id
             ORDER BY t.date ASC, t.id ASC
         """,
-            conn,
-        )
-
-    if df_tx.empty:
-        return pd.DataFrame(), pd.DataFrame()
-
-    positions = {}
-    for _, tx in df_tx.iterrows():
-        tk = tx["ticker"]
-        if tk not in positions:
-            positions[tk] = {
-                "asset_id": tx["asset_id"],
-                "ticker": tk,
-                "name": tx["name"],
-                "sector": tx["sector"] if tx["sector"] else "Divers",
-                "quantity": 0.0,
-                "total_cost": 0.0,
-                "realized_pnl": 0.0,
-            }
-
-        pos = positions[tk]
-        q, p, f = float(tx["quantity"]), float(tx["price"]), float(tx["fees"])
-
-        if tx["type"] == "BUY":
-            pos["total_cost"] += (q * p) + f
-            pos["quantity"] += q
-        elif tx["type"] == "SELL":
-            if pos["quantity"] > 0:
-                avg_cost = pos["total_cost"] / pos["quantity"]
-                pos["realized_pnl"] += (p - avg_cost) * q - f
-                pos["quantity"] -= q
-                pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
-
-    active = [p for p in positions.values() if p["quantity"] > 0.0001]
-    if not active:
-        return pd.DataFrame(), df_tx
-
-    df_pos = pd.DataFrame(active)
-    live = fetch_live_quotes(df_pos["ticker"].tolist())
-
-    df_pos["pru"] = df_pos["total_cost"] / df_pos["quantity"]
-    df_pos["current_price"] = df_pos["ticker"].map(
-        lambda x: live.get(x, {}).get("price", 0.0)
-    )
-    df_pos["day_change"] = df_pos["ticker"].map(
-        lambda x: live.get(x, {}).get("day_change", 0.0)
-    )
-    df_pos["pe"] = df_pos["ticker"].map(lambda x: live.get(x, {}).get("pe"))
-    df_pos["div_yield"] = df_pos["ticker"].map(
-        lambda x: live.get(x, {}).get("yield", 3.8)
-    )
-    df_pos["sector"] = df_pos["ticker"].map(
-        lambda x: live.get(x, {}).get("sector")
-        or df_pos.loc[df_pos["ticker"] == x, "sector"].iloc[0]
-        or "Divers"
+        conn,
     )
 
-    df_pos["valuation"] = df_pos["quantity"] * df_pos["current_price"]
-    df_pos["unrealized_pnl"] = df_pos["valuation"] - df_pos["total_cost"]
-    df_pos["unrealized_pnl_pct"] = (
-        df_pos["unrealized_pnl"] / df_pos["total_cost"]
-    ) * 100
+  if df_tx.empty:
+    return pd.DataFrame(), pd.DataFrame()
 
-    tot_val = df_pos["valuation"].sum()
-    df_pos["weight"] = (df_pos["valuation"] / tot_val * 100) if tot_val > 0 else 0.0
+  positions = {}
+  for _, tx in df_tx.iterrows():
+    tk = tx["ticker"]
+    if tk not in positions:
+      positions[tk] = {
+          "asset_id": tx["asset_id"],
+          "ticker": tk,
+          "name": tx["name"],
+          "sector": tx["sector"] if tx["sector"] else "Divers",
+          "quantity": 0.0,
+          "total_cost": 0.0,
+          "realized_pnl": 0.0,
+      }
 
-    return df_pos, df_tx
+    pos = positions[tk]
+    q, p, f = float(tx["quantity"]), float(tx["price"]), float(tx["fees"])
+
+    if tx["type"] == "BUY":
+      pos["total_cost"] += (q * p) + f
+      pos["quantity"] += q
+    elif tx["type"] == "SELL":
+      if pos["quantity"] > 0:
+        avg_cost = pos["total_cost"] / pos["quantity"]
+        pos["realized_pnl"] += (p - avg_cost) * q - f
+        pos["quantity"] -= q
+        pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
+
+  active = [p for p in positions.values() if p["quantity"] > 0.0001]
+  if not active:
+    return pd.DataFrame(), df_tx
+
+  df_pos = pd.DataFrame(active)
+  live = fetch_live_quotes(df_pos["ticker"].tolist())
+
+  df_pos["pru"] = df_pos["total_cost"] / df_pos["quantity"]
+  df_pos["current_price"] = df_pos["ticker"].map(
+      lambda x: live.get(x, {}).get("price", 0.0)
+  )
+  df_pos["day_change"] = df_pos["ticker"].map(
+      lambda x: live.get(x, {}).get("day_change", 0.0)
+  )
+  df_pos["pe"] = df_pos["ticker"].map(lambda x: live.get(x, {}).get("pe"))
+  df_pos["div_yield"] = df_pos["ticker"].map(
+      lambda x: live.get(x, {}).get("yield", 3.8)
+  )
+  df_pos["sector"] = df_pos["ticker"].map(
+      lambda x: live.get(x, {}).get("sector")
+      or df_pos.loc[df_pos["ticker"] == x, "sector"].iloc[0]
+      or "Divers"
+  )
+
+  df_pos["valuation"] = df_pos["quantity"] * df_pos["current_price"]
+  df_pos["unrealized_pnl"] = df_pos["valuation"] - df_pos["total_cost"]
+  df_pos["unrealized_pnl_pct"] = (
+      df_pos["unrealized_pnl"] / df_pos["total_cost"]
+  ) * 100
+
+  tot_val = df_pos["valuation"].sum()
+  df_pos["weight"] = (df_pos["valuation"] / tot_val * 100) if tot_val > 0 else 0.0
+
+  return df_pos, df_tx
 
 
 df_positions, df_transactions = get_portfolio_data()
@@ -760,86 +763,87 @@ tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
 # ONGLET 1 : MARCHÉS & SYNTHÈSE
 # ====================================================
 with tab_brief:
-    indices_data = get_market_indices()
-    col_i1, col_i2, col_i3, col_date = st.columns([1, 1, 1, 1.2])
+  indices_data = get_market_indices()
+  col_i1, col_i2, col_i3, col_date = st.columns([1, 1, 1, 1.2])
 
-    for col, (idx_name, vals) in zip([col_i1, col_i2, col_i3], indices_data.items()):
-        with col:
-            color = (
-                "#10b981"
-                if vals["change"] >= 0
-                else ("#f43f5e" if vals["change"] < 0 else "#94a3b8")
-            )
-            prefix = "+" if vals["change"] > 0 else ""
-            st.markdown(
-                f"""<div class="index-pill">
+  for col, (idx_name, vals) in zip(
+      [col_i1, col_i2, col_i3], indices_data.items()
+  ):
+    with col:
+      color = (
+          "#10b981"
+          if vals["change"] >= 0
+          else ("#f43f5e" if vals["change"] < 0 else "#94a3b8")
+      )
+      prefix = "+" if vals["change"] > 0 else ""
+      st.markdown(
+          f"""<div class="index-pill">
             <div>
                 <div style="font-size:0.72rem; font-weight:600; color:#64748b;">{idx_name}</div>
                 <div class="mono" style="font-size:1.05rem; font-weight:700; color:#ffffff; margin-top:2px;">{vals['price']:,.2f}</div>
             </div>
             <div class="mono" style="font-size:0.85rem; font-weight:600; color:{color};">{prefix}{vals['change']:.2f} %</div>
           </div>""",
-                unsafe_allow_html=True,
-            )
+          unsafe_allow_html=True,
+      )
 
-    with col_date:
-        st.markdown(
-            f"""<div class="index-pill" style="justify-content:center; text-align:center;">
+  with col_date:
+    st.markdown(
+        f"""<div class="index-pill" style="justify-content:center; text-align:center;">
         <div>
             <div style="font-size:0.72rem; font-weight:600; color:#64748b;">SÉANCE DU JOUR</div>
             <div style="font-size:0.92rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{get_french_date()}</div>
         </div>
       </div>""",
-            unsafe_allow_html=True,
-        )
+        unsafe_allow_html=True,
+    )
+
+  st.write("")
+
+  if df_positions.empty:
+    st.info("Synchronisation du portefeuille...")
+  else:
+    current_val_raw = df_positions["valuation"].sum()
+    current_val = current_val_raw * PRIVACY_RATIO
+
+    capital_reellement_investi_raw = 12872.00
+    capital_reellement_investi = capital_reellement_investi_raw * PRIVACY_RATIO
+
+    gain_net_total = current_val - capital_reellement_investi
+    official_perf_cumul = (gain_net_total / capital_reellement_investi) * 100.0
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Actif net réévalué", f"{current_val:,.2f} €")
+    k2.metric(
+        "Performance cumulée",
+        f"{official_perf_cumul:+.2f} %",
+        delta=f"{gain_net_total:+,.2f} € net",
+    )
+    k3.metric("Capital réellement versé", f"{capital_reellement_investi:,.2f} €")
+    k4.metric(
+        "Lignes ouvertes",
+        f"{len(df_positions):02d}",
+        f"{df_positions['sector'].nunique()} secteurs",
+    )
 
     st.write("")
 
-    if df_positions.empty:
-        st.info("Synchronisation du portefeuille...")
-    else:
-        # Prise en compte du ratio de confidentialité
-        current_val_raw = df_positions["valuation"].sum()
-        current_val = current_val_raw * PRIVACY_RATIO
+    c_focus, c_arb, c_news = st.columns([1.1, 1.1, 1.2], gap="medium")
 
-        capital_reellement_investi_raw = 12872.00
-        capital_reellement_investi = capital_reellement_investi_raw * PRIVACY_RATIO
+    with c_focus:
+      st.markdown("##### Focus Valeurs")
+      best_pos = df_positions.sort_values(
+          "unrealized_pnl_pct", ascending=False
+      ).iloc[0]
+      worst_pos = df_positions.sort_values(
+          "unrealized_pnl_pct", ascending=True
+      ).iloc[0]
 
-        gain_net_total = current_val - capital_reellement_investi
-        official_perf_cumul = (gain_net_total / capital_reellement_investi) * 100.0
+      best_pnl_display = best_pos["unrealized_pnl"] * PRIVACY_RATIO
+      worst_pnl_display = worst_pos["unrealized_pnl"] * PRIVACY_RATIO
 
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Actif net réévalué", f"{current_val:,.2f} €")
-        k2.metric(
-            "Performance cumulée",
-            f"{official_perf_cumul:+.2f} %",
-            delta=f"{gain_net_total:+,.2f} € net",
-        )
-        k3.metric("Capital réellement versé", f"{capital_reellement_investi:,.2f} €")
-        k4.metric(
-            "Lignes ouvertes",
-            f"{len(df_positions):02d}",
-            f"{df_positions['sector'].nunique()} secteurs",
-        )
-
-        st.write("")
-
-        c_focus, c_arb, c_news = st.columns([1.1, 1.1, 1.2], gap="medium")
-
-        with c_focus:
-            st.markdown("##### Focus Valeurs")
-            best_pos = df_positions.sort_values(
-                "unrealized_pnl_pct", ascending=False
-            ).iloc[0]
-            worst_pos = df_positions.sort_values(
-                "unrealized_pnl_pct", ascending=True
-            ).iloc[0]
-
-            best_pnl_display = best_pos['unrealized_pnl'] * PRIVACY_RATIO
-            worst_pnl_display = worst_pos['unrealized_pnl'] * PRIVACY_RATIO
-
-            st.markdown(
-                f"""<div class="glass-card" style="margin-bottom:10px; border-left: 3px solid #10b981;">
+      st.markdown(
+          f"""<div class="glass-card" style="margin-bottom:10px; border-left: 3px solid #10b981;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:0.75rem; font-weight:700; color:#10b981;">SURPERFORMANCE</span>
                 <span class="mono" style="font-size:0.75rem; color:#64748b;">Poids : {best_pos['weight']:.1f} %</span>
@@ -859,23 +863,23 @@ with tab_brief:
                 Performance : <span style="color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; font-weight:700;">{worst_pos['unrealized_pnl_pct']:+.2f} %</span> ({worst_pnl_display:+,.2f} €)
             </div>
           </div>""",
-                unsafe_allow_html=True,
-            )
+          unsafe_allow_html=True,
+      )
 
-            weighted_div = (
-                (df_positions["valuation"] * df_positions["div_yield"]).sum()
-                / current_val_raw
-                if current_val_raw > 0
-                else 3.85
-            )
-            if weighted_div > 15.0 or weighted_div <= 0.5:
-                weighted_div = 3.92
+      weighted_div = (
+          (df_positions["valuation"] * df_positions["div_yield"]).sum()
+          / current_val_raw
+          if current_val_raw > 0
+          else 3.85
+      )
+      if weighted_div > 15.0 or weighted_div <= 0.5:
+        weighted_div = 3.92
 
-            nb_pos = len(df_positions[df_positions["unrealized_pnl"] >= 0])
-            nb_neg = len(df_positions[df_positions["unrealized_pnl"] < 0])
+      nb_pos = len(df_positions[df_positions["unrealized_pnl"] >= 0])
+      nb_neg = len(df_positions[df_positions["unrealized_pnl"] < 0])
 
-            st.markdown(
-                f"""<div class="glass-card" style="border-left: 3px solid #38bdf8;">
+      st.markdown(
+          f"""<div class="glass-card" style="border-left: 3px solid #38bdf8;">
             <div style="font-size:0.75rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:6px;">
                 Métrique Portefeuille & Rendement
             </div>
@@ -888,23 +892,23 @@ with tab_brief:
                 <span class="mono" style="font-weight:700; color:#10b981;">{nb_pos} <span style="color:#64748b;">vs</span> <span style="color:#f43f5e;">{nb_neg}</span></span>
             </div>
           </div>""",
-                unsafe_allow_html=True,
-            )
+          unsafe_allow_html=True,
+      )
 
-        with c_arb:
-            st.markdown("##### Derniers arbitrages")
-            recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
-            for _, tx in recent_tx.iterrows():
-                badge_bg = (
-                    "rgba(16, 185, 129, 0.15)"
-                    if tx["type"] == "BUY"
-                    else "rgba(244, 63, 94, 0.15)"
-                )
-                badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
-                badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
-                qty_display = tx['quantity'] * PRIVACY_RATIO
-                st.markdown(
-                    f"""<div class="glass-card" style="padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+    with c_arb:
+      st.markdown("##### Derniers arbitrages")
+      recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
+      for _, tx in recent_tx.iterrows():
+        badge_bg = (
+            "rgba(16, 185, 129, 0.15)"
+            if tx["type"] == "BUY"
+            else "rgba(244, 63, 94, 0.15)"
+        )
+        badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
+        badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
+        qty_display = tx["quantity"] * PRIVACY_RATIO
+        st.markdown(
+            f"""<div class="glass-card" style="padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="background:{badge_bg}; color:{badge_color}; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:4px;">{badge_lbl}</span>
@@ -917,18 +921,18 @@ with tab_brief:
                     <div style="font-size:0.7rem; color:#64748b;">{tx['date']}</div>
                 </div>
             </div>""",
-                    unsafe_allow_html=True,
-                )
+            unsafe_allow_html=True,
+        )
 
-        with c_news:
-            st.markdown("##### Dépêches financières (Chronologique)")
-            active_tickers = df_positions["ticker"].tolist()
-            news_items = get_portfolio_news_rss(active_tickers)
+    with c_news:
+      st.markdown("##### Dépêches financières (Chronologique)")
+      active_tickers = df_positions["ticker"].tolist()
+      news_items = get_portfolio_news_rss(active_tickers)
 
-            if news_items:
-                news_html = '<div class="glass-card news-container" style="padding:0;">'
-                for item in news_items:
-                    news_html += f"""<div class="news-item">
+      if news_items:
+        news_html = '<div class="glass-card news-container" style="padding:0;">'
+        for item in news_items:
+          news_html += f"""<div class="news-item">
             <div style="display:flex; justify-content:space-between; align-items:baseline;">
                 <span class="mono" style="font-size:0.72rem; font-weight:700; color:#38bdf8;">{item['ticker']}</span>
                 <span class="mono" style="font-size:0.7rem; color:#64748b;">{item['pubDate']}</span>
@@ -939,519 +943,372 @@ with tab_brief:
                 </a>
             </div>
           </div>"""
-                news_html += "</div>"
-                st.markdown(news_html, unsafe_allow_html=True)
-            else:
-                st.caption("Synchronisation des dépêches en cours...")
+        news_html += "</div>"
+        st.markdown(news_html, unsafe_allow_html=True)
+      else:
+        st.caption("Synchronisation des dépêches en cours...")
 
 # ====================================================
 # ONGLET 2 : PORTEFEUILLE, ORDRES & GESTION
 # ====================================================
 with tab_holdings:
-    col_saisie, col_table = st.columns([1, 3.2], gap="large")
+  col_saisie, col_table = st.columns([1, 3.2], gap="large")
 
-    with col_saisie:
-        st.markdown("#### Nouvel ordre")
-        search_input = st.text_input(
-            "Rechercher un actif",
-            placeholder="Nom ou ticker...",
-        )
-        search_results = search_yahoo(search_input)
+  with col_saisie:
+    st.markdown("#### Nouvel ordre")
+    search_input = st.text_input(
+        "Rechercher un actif",
+        placeholder="Nom ou ticker...",
+    )
+    search_results = search_yahoo(search_input)
 
-        selected_asset = None
-        if search_results:
-            options = {
-                f"{item['name']} ({item['ticker']})": item for item in search_results
-            }
-            picked_label = st.selectbox(
-                "Valeur sélectionnée", list(options.keys()), index=0
-            )
-            selected_asset = options[picked_label]
+    selected_asset = None
+    if search_results:
+      options = {
+          f"{item['name']} ({item['ticker']})": item for item in search_results
+      }
+      picked_label = st.selectbox(
+          "Valeur sélectionnée", list(options.keys()), index=0
+      )
+      selected_asset = options[picked_label]
 
-        with st.form("tx_entry_form", clear_on_submit=True):
-            op_type = st.selectbox(
-                "Sens de l'opération", ["Achat", "Vente", "Dividende"]
-            )
-            op_date = st.date_input("Date d'exécution", value=datetime.today())
+    with st.form("tx_entry_form", clear_on_submit=True):
+      op_type = st.selectbox(
+          "Sens de l'opération", ["Achat", "Vente", "Dividende"]
+      )
+      op_date = st.date_input("Date d'exécution", value=datetime.today())
 
-            c_q, c_p = st.columns(2)
-            quantity = c_q.number_input(
-                "Quantité", min_value=0.0001, value=1.0, step=1.0
-            )
-            price = c_p.number_input(
-                "Prix unitaire (€)", min_value=0.0001, value=100.0, step=0.1
-            )
+      c_q, c_p = st.columns(2)
+      quantity = c_q.number_input(
+          "Quantité", min_value=0.0001, value=1.0, step=1.0
+      )
+      price = c_p.number_input(
+          "Prix unitaire (€)", min_value=0.0001, value=100.0, step=0.1
+      )
 
-            c_f, c_fx = st.columns(2)
-            fees = c_f.number_input("Frais de courtage (€)", min_value=0.0, value=0.0)
-            fx_rate = c_fx.number_input(
-                "Taux de change", min_value=0.0001, value=1.0, step=0.01
-            )
+      c_f, c_fx = st.columns(2)
+      fees = c_f.number_input("Frais de courtage (€)", min_value=0.0, value=0.0)
+      fx_rate = c_fx.number_input(
+          "Taux de change", min_value=0.0001, value=1.0, step=0.01
+      )
 
-            reason = st.text_input(
-                "Motif d'investissement",
-                placeholder="Ex: Valorisation décotée, catalyseur...",
-            )
-            notes = st.text_area(
-                "Thèse & Métriques clés",
-                placeholder="Ratios clés, ROE/ROCE, croissance attendue...",
-            )
+      reason = st.text_input(
+          "Motif d'investissement",
+          placeholder="Ex: Valorisation décotée, catalyseur...",
+      )
+      notes = st.text_area(
+          "Thèse & Métriques clés",
+          placeholder="Ratios clés, ROE/ROCE, croissance attendue...",
+      )
 
-            submit = st.form_submit_button(
-                "Valider l'opération", use_container_width=True
-            )
+      submit = st.form_submit_button(
+          "Valider l'opération", use_container_width=True
+      )
 
-            if submit:
-                if not selected_asset:
-                    st.error("Sélectionnez une valeur avant de valider.")
-                else:
-                    type_code = (
-                        "BUY"
-                        if op_type == "Achat"
-                        else ("SELL" if op_type == "Vente" else "DIVIDEND")
-                    )
-                    with get_connection() as conn:
-                        cur = conn.cursor()
-                        cur.execute(
-                            """
+      if submit:
+        if not selected_asset:
+          st.error("Sélectionnez une valeur avant de valider.")
+        else:
+          type_code = (
+              "BUY"
+              if op_type == "Achat"
+              else ("SELL" if op_type == "Vente" else "DIVIDEND")
+          )
+          with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
                             INSERT INTO assets (ticker, name, sector)
                             VALUES (?, ?, ?)
                             ON CONFLICT(ticker) DO UPDATE SET name=excluded.name, sector=excluded.sector
                         """,
-                            (
-                                selected_asset["ticker"],
-                                selected_asset["name"],
-                                selected_asset["sector"],
-                            ),
-                        )
-                        cur.execute(
-                            "SELECT id FROM assets WHERE ticker = ?",
-                            (selected_asset["ticker"],),
-                        )
-                        asset_id = cur.fetchone()[0]
+                (
+                    selected_asset["ticker"],
+                    selected_asset["name"],
+                    selected_asset["sector"],
+                ),
+            )
+            cur.execute(
+                "SELECT id FROM assets WHERE ticker = ?",
+                (selected_asset["ticker"],),
+            )
+            asset_id = cur.fetchone()[0]
 
-                        cur.execute(
-                            """
+            cur.execute(
+                """
                             INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                            (
-                                asset_id,
-                                type_code,
-                                op_date.strftime("%Y-%m-%d"),
-                                quantity,
-                                price,
-                                fees,
-                                fx_rate,
-                                reason,
-                                notes,
-                            ),
-                        )
-                        conn.commit()
-
-                    st.success(f"Opération enregistrée pour {selected_asset['name']}.")
-                    st.rerun()
-
-    with col_table:
-        st.markdown("#### Positions ouvertes")
-        if df_positions.empty:
-            st.write("Aucune position active.")
-        else:
-            rows = []
-            for _, pos in df_positions.iterrows():
-                pnl_class = "badge-pos" if pos["unrealized_pnl"] >= 0 else "badge-neg"
-                qty_display = pos['quantity'] * PRIVACY_RATIO
-                val_display = pos['valuation'] * PRIVACY_RATIO
-                pnl_display = pos['unrealized_pnl'] * PRIVACY_RATIO
-
-                row = (
-                    "<tr>"
-                    "<td>"
-                    f"<div style='font-weight:700; color:#ffffff;'>{pos['name']}</div>"
-                    f"<span class='mono' style='font-size:0.75rem; color:#64748b;'>{pos['ticker']}</span>"
-                    "</td>"
-                    f"<td><span class='badge-sector'>{pos['sector']}</span></td>"
-                    f"<td class='mono'>{qty_display:.2f}</td>"
-                    f"<td class='mono' style='color:#94a3b8;'>{pos['pru']:.2f} €</td>"
-                    f"<td class='mono' style='font-weight:600; color:#f1f5f9;'>{pos['current_price']:.2f} €</td>"
-                    f"<td class='mono' style='font-weight:700; color:#ffffff;'>{val_display:,.2f} €</td>"
-                    f"<td class='{pnl_class}'>{pnl_display:+,.2f} €<br><span style='font-size:0.75rem;'>({pos['unrealized_pnl_pct']:+.2f} %)</span></td>"
-                    f"<td class='mono' style='color:#64748b;'>{pos['weight']:.1f} %</td>"
-                    "</tr>"
-                )
-                rows.append(row)
-
-            table_html = (
-                "<div class='glass-card' style='padding:0px; overflow-x:auto; width: 100%;'>"
-                "<table class='custom-table'>"
-                "<thead><tr>"
-                "<th>Actif</th><th>Secteur</th><th>Quantité</th><th>PRU</th><th>Cours</th><th>Valorisation</th><th>Plus/Moins-value</th><th>Poids</th>"
-                "</tr></thead>"
-                f"<tbody>{''.join(rows)}</tbody>"
-                "</table>"
-                "</div>"
+                (
+                    asset_id,
+                    type_code,
+                    op_date.strftime("%Y-%m-%d"),
+                    quantity,
+                    price,
+                    fees,
+                    fx_rate,
+                    reason,
+                    notes,
+                ),
             )
-            st.markdown(table_html, unsafe_allow_html=True)
+            conn.commit()
 
-    # Section Gestion
-    st.write("")
-    st.divider()
-    st.markdown("#### Gestion des positions & opérations")
-    col_del_asset, col_edit_tx = st.columns([1, 1.8], gap="large")
+          st.success(f"Opération enregistrée pour {selected_asset['name']}.")
+          st.rerun()
 
-    with col_del_asset:
-        st.markdown("##### Clôturer / Supprimer une ligne")
-        if not df_positions.empty:
-            asset_dict = {
-                f"{row['name']} ({row['ticker']})": row["ticker"]
-                for _, row in df_positions.iterrows()
-            }
-            asset_selected_label = st.selectbox(
-                "Sélectionner la valeur à retirer :",
-                list(asset_dict.keys()),
-                key="del_asset_select",
+  with col_table:
+    st.markdown("#### Positions ouvertes")
+    if df_positions.empty:
+      st.write("Aucune position active.")
+    else:
+      rows = []
+      for _, pos in df_positions.iterrows():
+        pnl_class = "badge-pos" if pos["unrealized_pnl"] >= 0 else "badge-neg"
+        qty_display = pos["quantity"] * PRIVACY_RATIO
+        val_display = pos["valuation"] * PRIVACY_RATIO
+        pnl_display = pos["unrealized_pnl"] * PRIVACY_RATIO
+
+        row = (
+            "<tr>"
+            "<td>"
+            f"<div style='font-weight:700; color:#ffffff;'>{pos['name']}</div>"
+            f"<span class='mono' style='font-size:0.75rem; color:#64748b;'>{pos['ticker']}</span>"
+            "</td>"
+            f"<td><span class='badge-sector'>{pos['sector']}</span></td>"
+            f"<td class='mono'>{qty_display:.2f}</td>"
+            f"<td class='mono' style='color:#94a3b8;'>{pos['pru']:.2f} €</td>"
+            f"<td class='mono' style='font-weight:600; color:#f1f5f9;'>{pos['current_price']:.2f} €</td>"
+            f"<td class='mono' style='font-weight:700; color:#ffffff;'>{val_display:,.2f} €</td>"
+            f"<td class='{pnl_class}'>{pnl_display:+,.2f} €<br><span style='font-size:0.75rem;'>({pos['unrealized_pnl_pct']:+.2f} %)</span></td>"
+            f"<td class='mono' style='color:#64748b;'>{pos['weight']:.1f} %</td>"
+            "</tr>"
+        )
+        rows.append(row)
+
+      table_html = (
+          "<div class='glass-card' style='padding:0px; overflow-x:auto; width:"
+          " 100%;'><table class='custom-table'><thead><tr><th>Actif</th><th>Secteur</th><th>Quantité</th><th>PRU</th><th>Cours</th><th>Valorisation</th><th>Plus/Moins-value</th><th>Poids</th></tr></thead><tbody>"
+          + "".join(rows)
+          + "</tbody></table></div>"
+      )
+      st.markdown(table_html, unsafe_allow_html=True)
+
+  # Section Gestion
+  st.write("")
+  st.divider()
+  st.markdown("#### Gestion des positions & opérations")
+  col_del_asset, col_edit_tx = st.columns([1, 1.8], gap="large")
+
+  with col_del_asset:
+    st.markdown("##### Clôturer / Supprimer une ligne")
+    if not df_positions.empty:
+      asset_dict = {
+          f"{row['name']} ({row['ticker']})": row["ticker"]
+          for _, row in df_positions.iterrows()
+      }
+      asset_selected_label = st.selectbox(
+          "Sélectionner la valeur à retirer :",
+          list(asset_dict.keys()),
+          key="del_asset_select",
+      )
+      ticker_to_delete = asset_dict[asset_selected_label]
+
+      if st.button(
+          f"Supprimer la ligne {ticker_to_delete}",
+          key="btn_del_asset",
+          type="primary",
+      ):
+        with get_connection() as conn:
+          cur = conn.cursor()
+          cur.execute(
+              "SELECT id FROM assets WHERE ticker = ?", (ticker_to_delete,)
+          )
+          row_a = cur.fetchone()
+          if row_a:
+            aid = row_a[0]
+            cur.execute(
+                "DELETE FROM transactions WHERE asset_id = ?", (aid,)
             )
-            ticker_to_delete = asset_dict[asset_selected_label]
+            cur.execute("DELETE FROM assets WHERE id = ?", (aid,))
+            conn.commit()
+        st.success(f"La valeur {ticker_to_delete} a été retirée.")
+        st.rerun()
 
-            if st.button(
-                f"Supprimer la ligne {ticker_to_delete}",
-                key="btn_del_asset",
-                type="primary",
-            ):
-                with get_connection() as conn:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "SELECT id FROM assets WHERE ticker = ?", (ticker_to_delete,)
-                    )
-                    row_a = cur.fetchone()
-                    if row_a:
-                        aid = row_a[0]
-                        cur.execute(
-                            "DELETE FROM transactions WHERE asset_id = ?", (aid,)
-                        )
-                        cur.execute("DELETE FROM assets WHERE id = ?", (aid,))
-                        conn.commit()
-                st.success(f"La valeur {ticker_to_delete} a été retirée.")
-                st.rerun()
+  with col_edit_tx:
+    st.markdown("##### Modifier ou supprimer une transaction précise")
+    if not df_transactions.empty:
+      tx_options = {}
+      for _, t in df_transactions.iterrows():
+        q_disp = t["quantity"] * PRIVACY_RATIO
+        lbl = (
+            f"ID #{t['id']} — {t['date']} | {t['type']} {t['ticker']} ("
+            f"{q_disp:.2f} titres @ {t['price']:.2f} €)"
+        )
+        tx_options[lbl] = t["id"]
 
-    with col_edit_tx:
-        st.markdown("##### Modifier ou supprimer une transaction précise")
-        if not df_transactions.empty:
-            tx_options = {}
-            for _, t in df_transactions.iterrows():
-                q_disp = t['quantity'] * PRIVACY_RATIO
-                lbl = (
-                    f"ID #{t['id']} — {t['date']} | {t['type']} {t['ticker']} ("
-                    f"{q_disp:.2f} titres @ {t['price']:.2f} €)"
-                )
-                tx_options[lbl] = t["id"]
+      selected_tx_lbl = st.selectbox(
+          "Sélectionner l'opération :",
+          list(tx_options.keys()),
+          key="edit_tx_select",
+      )
+      tx_id = tx_options[selected_tx_lbl]
+      tx_data = df_transactions[df_transactions["id"] == tx_id].iloc[0]
 
-            selected_tx_lbl = st.selectbox(
-                "Sélectionner l'opération :",
-                list(tx_options.keys()),
-                key="edit_tx_select",
-            )
-            tx_id = tx_options[selected_tx_lbl]
-            tx_data = df_transactions[df_transactions["id"] == tx_id].iloc[0]
+      with st.form("form_edit_single_tx"):
+        c1, c2, c3 = st.columns(3)
+        edit_type = c1.selectbox(
+            "Sens",
+            ["BUY", "SELL", "DIVIDEND"],
+            index=["BUY", "SELL", "DIVIDEND"].index(tx_data["type"]),
+        )
+        edit_date = c2.date_input(
+            "Date", value=datetime.strptime(tx_data["date"], "%Y-%m-%d")
+        )
+        edit_qty = c3.number_input(
+            "Quantité réelle",
+            min_value=0.0001,
+            value=float(tx_data["quantity"]),
+        )
 
-            with st.form("form_edit_single_tx"):
-                c1, c2, c3 = st.columns(3)
-                edit_type = c1.selectbox(
-                    "Sens",
-                    ["BUY", "SELL", "DIVIDEND"],
-                    index=["BUY", "SELL", "DIVIDEND"].index(tx_data["type"]),
-                )
-                edit_date = c2.date_input(
-                    "Date", value=datetime.strptime(tx_data["date"], "%Y-%m-%d")
-                )
-                edit_qty = c3.number_input(
-                    "Quantité réelle", min_value=0.0001, value=float(tx_data["quantity"])
-                )
+        c4, c5 = st.columns(2)
+        edit_px = c4.number_input(
+            "Prix unitaire (€)", min_value=0.0001, value=float(tx_data["price"])
+        )
+        edit_fees = c5.number_input(
+            "Frais (€)", min_value=0.0, value=float(tx_data["fees"])
+        )
 
-                c4, c5 = st.columns(2)
-                edit_px = c4.number_input(
-                    "Prix unitaire (€)", min_value=0.0001, value=float(tx_data["price"])
-                )
-                edit_fees = c5.number_input(
-                    "Frais (€)", min_value=0.0, value=float(tx_data["fees"])
-                )
+        edit_reason = st.text_input(
+            "Motif", value=str(tx_data["reason"] or "")
+        )
+        edit_notes = st.text_area(
+            "Thèse / Ratios", value=str(tx_data["notes"] or "")
+        )
 
-                edit_reason = st.text_input(
-                    "Motif", value=str(tx_data["reason"] or "")
-                )
-                edit_notes = st.text_area(
-                    "Thèse / Ratios", value=str(tx_data["notes"] or "")
-                )
+        btn_c1, btn_c2 = st.columns(2)
+        save_changes = btn_c1.form_submit_button(
+            "Enregistrer les modifications", use_container_width=True
+        )
+        delete_tx = btn_c2.form_submit_button(
+            "Supprimer cette transaction", use_container_width=True
+        )
 
-                btn_c1, btn_c2 = st.columns(2)
-                save_changes = btn_c1.form_submit_button(
-                    "Enregistrer les modifications", use_container_width=True
-                )
-                delete_tx = btn_c2.form_submit_button(
-                    "Supprimer cette transaction", use_container_width=True
-                )
-
-                if save_changes:
-                    with get_connection() as conn:
-                        cur = conn.cursor()
-                        cur.execute(
-                            """
+        if save_changes:
+          with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
                             UPDATE transactions 
                             SET type = ?, date = ?, quantity = ?, price = ?, fees = ?, reason = ?, notes = ?
                             WHERE id = ?
                         """,
-                            (
-                                edit_type,
-                                edit_date.strftime("%Y-%m-%d"),
-                                edit_qty,
-                                edit_px,
-                                edit_fees,
-                                edit_reason,
-                                edit_notes,
-                                tx_id,
-                            ),
-                        )
-                        conn.commit()
-                    st.success("Transaction mise à jour.")
-                    st.rerun()
+                (
+                    edit_type,
+                    edit_date.strftime("%Y-%m-%d"),
+                    edit_qty,
+                    edit_px,
+                    edit_fees,
+                    edit_reason,
+                    edit_notes,
+                    tx_id,
+                ),
+            )
+            conn.commit()
+          st.success("Transaction mise à jour.")
+          st.rerun()
 
-                if delete_tx:
-                    with get_connection() as conn:
-                        cur = conn.cursor()
-                        cur.execute("DELETE FROM transactions WHERE id = ?", (tx_id,))
-                        conn.commit()
-                    st.warning("Transaction supprimée.")
-                    st.rerun()
+        if delete_tx:
+          with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM transactions WHERE id = ?", (tx_id,))
+            conn.commit()
+          st.warning("Transaction supprimée.")
+          st.rerun()
 
 # ====================================================
 # ONGLET 3 : PERFORMANCE HISTORIQUE (AVEC YTD & 1J FONCTIONNEL)
 # ====================================================
 with tab_analytics:
-    df_history = pd.read_csv(StringIO(RAW_PERF_CSV.strip()))
-    df_history["Date"] = pd.to_datetime(df_history["Date"])
+  df_history = pd.read_csv(StringIO(RAW_PERF_CSV.strip()))
+  df_history["Date"] = pd.to_datetime(df_history["Date"])
 
-    timeline_options = [
-        "1J",
-        "5J",
-        "1M",
-        "3M",
-        "6M",
-        "1A",
-        "3A",
-        "5A",
-        "10A",
-        "YTD",
-        "MAX",
-    ]
-    selected_period = st.radio(
-        "Période d'analyse",
-        timeline_options,
-        index=9,
-        horizontal=True,
-        label_visibility="collapsed",
+  timeline_options = [
+      "1J",
+      "5J",
+      "1M",
+      "3M",
+      "6M",
+      "1A",
+      "3A",
+      "5A",
+      "10A",
+      "YTD",
+      "MAX",
+  ]
+  selected_period = st.radio(
+      "Période d'analyse",
+      timeline_options,
+      index=9,
+      horizontal=True,
+      label_visibility="collapsed",
+  )
+
+  if selected_period == "1J":
+    st.markdown("#### Performance de la séance (1J)")
+    if not df_positions.empty and df_positions["valuation"].sum() > 0:
+      day_perf_pct = (
+          df_positions["valuation"] * df_positions["day_change"]
+      ).sum() / df_positions["valuation"].sum()
+    else:
+      day_perf_pct = -0.56
+
+    st.caption(
+        f"Séance du jour : Performance globale estimée à {day_perf_pct:+.2f} %"
     )
 
-    if selected_period == "1J":
-        st.markdown("#### Performance de la séance (1J)")
-        if not df_positions.empty and df_positions["valuation"].sum() > 0:
-            day_perf_pct = (
-                df_positions["valuation"] * df_positions["day_change"]
-            ).sum() / df_positions["valuation"].sum()
-        else:
-            day_perf_pct = -0.56
+    try:
+      cac_ticker = yf.Ticker("^FCHI")
+      cac_hist = cac_ticker.history(period="1d", interval="5m")
+      if not cac_hist.empty:
+        c_open = cac_hist["Open"].iloc[0]
+        cac_curve = ((cac_hist["Close"] / c_open) - 1.0) * 100.0
 
-        st.caption(
-            f"Séance du jour : Performance globale estimée à {day_perf_pct:+.2f} %"
+        times = cac_hist.index
+        if hasattr(times, "tz") and times.tz is not None:
+          times = times.tz_convert("Europe/Paris").tz_localize(None)
+
+        n_pts = len(cac_curve)
+        weight_range = pd.Series(range(n_pts), index=times) / max(1, n_pts - 1)
+        port_curve = (
+            cac_curve * 0.8 + (day_perf_pct - cac_curve.iloc[-1]) * weight_range
         )
 
-        try:
-            cac_ticker = yf.Ticker("^FCHI")
-            cac_hist = cac_ticker.history(period="1d", interval="5m")
-            if not cac_hist.empty:
-                c_open = cac_hist["Open"].iloc[0]
-                cac_curve = ((cac_hist["Close"] / c_open) - 1.0) * 100.0
-
-                times = cac_hist.index
-                if hasattr(times, "tz") and times.tz is not None:
-                    times = times.tz_convert("Europe/Paris").tz_localize(None)
-
-                n_pts = len(cac_curve)
-                weight_range = pd.Series(range(n_pts), index=times) / max(1, n_pts - 1)
-                port_curve = (
-                    cac_curve * 0.8 + (day_perf_pct - cac_curve.iloc[-1]) * weight_range
-                )
-
-                fig_1j = go.Figure()
-                fig_1j.add_trace(
-                    go.Scatter(
-                        x=times,
-                        y=port_curve,
-                        mode="lines",
-                        name=f"Portefeuille ({day_perf_pct:+.2f}%)",
-                        line=dict(color="#38bdf8", width=2.4),
-                    )
-                )
-                fig_1j.add_trace(
-                    go.Scatter(
-                        x=times,
-                        y=cac_curve,
-                        mode="lines",
-                        name=f"CAC 40 ({cac_curve.iloc[-1]:+.2f}%)",
-                        line=dict(color="#64748b", width=1.5, dash="dot"),
-                    )
-                )
-                fig_1j.add_hline(
-                    y=0,
-                    line_dash="solid",
-                    line_color="rgba(255,255,255,0.15)",
-                    line_width=1,
-                )
-                fig_1j.update_layout(
-                    hovermode="x unified",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(color="#94a3b8"),
-                    margin=dict(t=10, b=10, l=10, r=10),
-                    xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                    yaxis=dict(
-                        showgrid=True,
-                        gridcolor="rgba(255,255,255,0.05)",
-                        title="Rendement (%)",
-                        ticksuffix=" %",
-                    ),
-                    legend=dict(
-                        orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
-                    ),
-                )
-                st.plotly_chart(fig_1j, use_container_width=True)
-            else:
-                st.info("Données intrajournalières indisponibles hors séance.")
-        except Exception:
-            st.info("Données intrajournalières de séance en synchronisation...")
-
-    else:
-        last_dt = df_history["Date"].max()
-        period_deltas = {
-            "5J": timedelta(days=7),
-            "1M": timedelta(days=30),
-            "3M": timedelta(days=90),
-            "6M": timedelta(days=180),
-            "1A": timedelta(days=365),
-            "3A": timedelta(days=365 * 3),
-            "5A": timedelta(days=365 * 5),
-            "10A": timedelta(days=365 * 10),
-        }
-
-        if selected_period in ["MAX", "YTD"]:
-            start_filter = df_history["Date"].min()
-        else:
-            start_filter = max(
-                df_history["Date"].min(), last_dt - period_deltas[selected_period]
-            )
-
-        filtered_df = (
-            df_history[df_history["Date"] >= start_filter]
-            .copy()
-            .sort_values("Date")
-        )
-
-        base_cumul = filtered_df["PerfCumul"].iloc[0]
-        filtered_df["Portfolio_Return_Pct"] = (
-            (1.0 + filtered_df["PerfCumul"] / 100.0)
-            / (1.0 + base_cumul / 100.0)
-            - 1.0
-        ) * 100.0
-
-        try:
-            bench_raw = yf.download(
-                "^FCHI", start=start_filter - timedelta(days=5), progress=False
-            )
-            if "Close" in bench_raw:
-                close_series = bench_raw["Close"]
-                if isinstance(close_series, pd.DataFrame):
-                    close_series = close_series.iloc[:, 0]
-            else:
-                close_series = pd.Series(dtype=float)
-
-            close_series = close_series.ffill().bfill()
-            if hasattr(close_series.index, "tz") and close_series.index.tz is not None:
-                close_series.index = close_series.index.tz_convert(None)
-
-            cac40_vals = []
-            for dt in filtered_df["Date"]:
-                prior = close_series.index[close_series.index <= dt]
-                if len(prior) > 0:
-                    cac40_vals.append(float(close_series.loc[prior[-1]]))
-                else:
-                    cac40_vals.append(1.0)
-            filtered_df["CAC_Close"] = cac40_vals
-        except Exception:
-            filtered_df["CAC_Close"] = 1.0
-
-        base_cac = (
-            filtered_df["CAC_Close"].iloc[0]
-            if filtered_df["CAC_Close"].iloc[0] > 0
-            else 1.0
-        )
-        filtered_df["CAC_Return_Pct"] = (
-            (filtered_df["CAC_Close"] / base_cac) - 1.0
-        ) * 100.0
-
-        cacms_daily_trend = (
-            1.0 + (filtered_df["CAC_Return_Pct"] * 0.72 - 1.5) / 100.0
-        )
-        filtered_df["CACMS_Return_Pct"] = (
-            cacms_daily_trend / cacms_daily_trend.iloc[0] - 1.0
-        ) * 100.0
-
-        st.markdown(f"#### Performance cumulée ({selected_period})")
-        st.caption(
-            "Portefeuille comparé au CAC 40 et à l'indice CAC Mid & Small."
-        )
-
-        fig_twr = go.Figure()
-        fig_twr.add_trace(
+        fig_1j = go.Figure()
+        fig_1j.add_trace(
             go.Scatter(
-                x=filtered_df["Date"],
-                y=filtered_df["Portfolio_Return_Pct"],
+                x=times,
+                y=port_curve,
                 mode="lines",
-                name=(
-                    f"Portefeuille"
-                    f" ({filtered_df['Portfolio_Return_Pct'].iloc[-1]:+.2f}%)"
-                ),
-                line=dict(color="#38bdf8", width=2.6),
+                name=f"Portefeuille ({day_perf_pct:+.2f}%)",
+                line=dict(color="#38bdf8", width=2.4),
             )
         )
-        fig_twr.add_trace(
+        fig_1j.add_trace(
             go.Scatter(
-                x=filtered_df["Date"],
-                y=filtered_df["CACMS_Return_Pct"],
+                x=times,
+                y=cac_curve,
                 mode="lines",
-                name=(
-                    f"CAC Mid & Small"
-                    f" ({filtered_df['CACMS_Return_Pct'].iloc[-1]:+.2f}%)"
-                ),
-                line=dict(color="#f59e0b", width=1.6, dash="dash"),
-            )
-        )
-        fig_twr.add_trace(
-            go.Scatter(
-                x=filtered_df["Date"],
-                y=filtered_df["CAC_Return_Pct"],
-                mode="lines",
-                name=f"CAC 40 ({filtered_df['CAC_Return_Pct'].iloc[-1]:+.2f}%)",
+                name=f"CAC 40 ({cac_curve.iloc[-1]:+.2f}%)",
                 line=dict(color="#64748b", width=1.5, dash="dot"),
             )
         )
-
-        fig_twr.add_hline(
+        fig_1j.add_hline(
             y=0,
             line_dash="solid",
             line_color="rgba(255,255,255,0.15)",
             line_width=1,
         )
-
-        fig_twr.update_layout(
+        fig_1j.update_layout(
             hovermode="x unified",
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
@@ -1468,150 +1325,297 @@ with tab_analytics:
                 orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
             ),
         )
-        st.plotly_chart(fig_twr, use_container_width=True)
+        st.plotly_chart(fig_1j, use_container_width=True)
+      else:
+        st.info("Données intrajournalières indisponibles hors séance.")
+    except Exception:
+      st.info("Données intrajournalières de séance en synchronisation...")
 
-    st.write("")
+  else:
+    last_dt = df_history["Date"].max()
+    period_deltas = {
+        "5J": timedelta(days=7),
+        "1M": timedelta(days=30),
+        "3M": timedelta(days=90),
+        "6M": timedelta(days=180),
+        "1A": timedelta(days=365),
+        "3A": timedelta(days=365 * 3),
+        "5A": timedelta(days=365 * 5),
+        "10A": timedelta(days=365 * 10),
+    }
 
-    c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
+    if selected_period in ["MAX", "YTD"]:
+      start_filter = df_history["Date"].min()
+    else:
+      start_filter = max(
+          df_history["Date"].min(), last_dt - period_deltas[selected_period]
+      )
 
-    with c_g1:
-        st.markdown("#### Structure du capital")
-        if not df_positions.empty:
-            df_pie = df_positions.copy()
-            df_pie["valuation"] = df_pie["valuation"] * PRIVACY_RATIO
-            fig_donut = px.pie(
-                df_pie,
-                values="valuation",
-                names="name",
-                hole=0.6,
-                color_discrete_sequence=[
-                    "#38bdf8",
-                    "#0284c7",
-                    "#0369a1",
-                    "#025985",
-                    "#075985",
-                    "#60a5fa",
-                    "#93c5fd",
-                ],
-            )
-            fig_donut.update_layout(
-                margin=dict(t=10, b=10, l=10, r=10),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#f8fafc"),
-                showlegend=True,
-            )
-            st.plotly_chart(fig_donut, use_container_width=True)
+    filtered_df = (
+        df_history[df_history["Date"] >= start_filter]
+        .copy()
+        .sort_values("Date")
+    )
 
-    with c_g2:
-        st.markdown("#### Plus / Moins-values (€)")
-        if not df_positions.empty:
-            sorted_contrib = df_positions.sort_values(
-                "unrealized_pnl", ascending=True
-            ).copy()
-            sorted_contrib["unrealized_pnl"] = (
-                sorted_contrib["unrealized_pnl"] * PRIVACY_RATIO
-            )
-            bar_colors = [
-                "#10b981" if v >= 0 else "#f43f5e"
-                for v in sorted_contrib["unrealized_pnl"]
-            ]
+    base_cumul = filtered_df["PerfCumul"].iloc[0]
+    filtered_df["Portfolio_Return_Pct"] = (
+        (1.0 + filtered_df["PerfCumul"] / 100.0)
+        / (1.0 + base_cumul / 100.0)
+        - 1.0
+    ) * 100.0
 
-            fig_contrib = go.Figure(
-                go.Bar(
-                    x=sorted_contrib["unrealized_pnl"],
-                    y=sorted_contrib["name"],
-                    orientation="h",
-                    marker=dict(color=bar_colors),
-                )
-            )
-            fig_contrib.update_layout(
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#94a3b8"),
-                margin=dict(t=10, b=10, l=10, r=10),
-                xaxis=dict(
-                    showgrid=True,
-                    gridcolor="rgba(255,255,255,0.05)",
-                    title="P&L (€)",
-                ),
-                yaxis=dict(showgrid=False, tickfont=dict(color="#f8fafc")),
-            )
-            st.plotly_chart(fig_contrib, use_container_width=True)
+    try:
+      bench_raw = yf.download(
+          "^FCHI", start=start_filter - timedelta(days=5), progress=False
+      )
+      if "Close" in bench_raw:
+        close_series = bench_raw["Close"]
+        if isinstance(close_series, pd.DataFrame):
+          close_series = close_series.iloc[:, 0]
+      else:
+        close_series = pd.Series(dtype=float)
 
-    with c_g3:
-        st.markdown("#### Multiples P/E")
-        pe_df = (
-            df_positions.dropna(subset=["pe"])[["name", "pe"]]
-            .sort_values("pe")
-            .copy()
-        )
-        if not pe_df.empty:
-            fig_pe = px.bar(
-                pe_df,
-                x="pe",
-                y="name",
-                orientation="h",
-                color="pe",
-                color_continuous_scale=["#3b82f6", "#1d4ed8"],
-            )
-            fig_pe.update_layout(
-                margin=dict(t=10, b=10, l=10, r=10),
-                height=280,
-                xaxis=dict(
-                    gridcolor="rgba(255,255,255,0.05)",
-                    title="Ratio P/E",
-                    tickfont=dict(family="JetBrains Mono"),
-                ),
-                yaxis=dict(
-                    gridcolor="rgba(255,255,255,0.05)",
-                    title="",
-                    tickfont=dict(color="#f8fafc"),
-                ),
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                coloraxis_showscale=False,
-            )
-            st.plotly_chart(fig_pe, use_container_width=True)
+      close_series = close_series.ffill().bfill()
+      if (
+          hasattr(close_series.index, "tz")
+          and close_series.index.tz is not None
+      ):
+        close_series.index = close_series.index.tz_convert(None)
+
+      cac40_vals = []
+      for dt in filtered_df["Date"]:
+        prior = close_series.index[close_series.index <= dt]
+        if len(prior) > 0:
+          cac40_vals.append(float(close_series.loc[prior[-1]]))
         else:
-            st.caption("Multiples indisponibles sur les lignes actives.")
+          cac40_vals.append(1.0)
+      filtered_df["CAC_Close"] = cac40_vals
+    except Exception:
+      filtered_df["CAC_Close"] = 1.0
+
+    base_cac = (
+        filtered_df["CAC_Close"].iloc[0]
+        if filtered_df["CAC_Close"].iloc[0] > 0
+        else 1.0
+    )
+    filtered_df["CAC_Return_Pct"] = (
+        (filtered_df["CAC_Close"] / base_cac) - 1.0
+    ) * 100.0
+
+    cacms_daily_trend = (
+        1.0 + (filtered_df["CAC_Return_Pct"] * 0.72 - 1.5) / 100.0
+    )
+    filtered_df["CACMS_Return_Pct"] = (
+        cacms_daily_trend / cacms_daily_trend.iloc[0] - 1.0
+    ) * 100.0
+
+    st.markdown(f"#### Performance cumulée ({selected_period})")
+    st.caption("Portefeuille comparé au CAC 40 et à l'indice CAC Mid & Small.")
+
+    fig_twr = go.Figure()
+    fig_twr.add_trace(
+        go.Scatter(
+            x=filtered_df["Date"],
+            y=filtered_df["Portfolio_Return_Pct"],
+            mode="lines",
+            name=(
+                f"Portefeuille"
+                f" ({filtered_df['Portfolio_Return_Pct'].iloc[-1]:+.2f}%)"
+            ),
+            line=dict(color="#38bdf8", width=2.6),
+        )
+    )
+    fig_twr.add_trace(
+        go.Scatter(
+            x=filtered_df["Date"],
+            y=filtered_df["CACMS_Return_Pct"],
+            mode="lines",
+            name=(
+                f"CAC Mid & Small"
+                f" ({filtered_df['CACMS_Return_Pct'].iloc[-1]:+.2f}%)"
+            ),
+            line=dict(color="#f59e0b", width=1.6, dash="dash"),
+        )
+    )
+    fig_twr.add_trace(
+        go.Scatter(
+            x=filtered_df["Date"],
+            y=filtered_df["CAC_Return_Pct"],
+            mode="lines",
+            name=f"CAC 40 ({filtered_df['CAC_Return_Pct'].iloc[-1]:+.2f}%)",
+            line=dict(color="#64748b", width=1.5, dash="dot"),
+        )
+    )
+
+    fig_twr.add_hline(
+        y=0,
+        line_dash="solid",
+        line_color="rgba(255,255,255,0.15)",
+        line_width=1,
+    )
+
+    fig_twr.update_layout(
+        hovermode="x unified",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#94a3b8"),
+        margin=dict(t=10, b=10, l=10, r=10),
+        xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="rgba(255,255,255,0.05)",
+            title="Rendement (%)",
+            ticksuffix=" %",
+        ),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+        ),
+    )
+    st.plotly_chart(fig_twr, use_container_width=True)
+
+  st.write("")
+
+  # Donut, P&L et PER
+  c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
+
+  with c_g1:
+    st.markdown("#### Structure du capital")
+    if not df_positions.empty:
+      df_pie = df_positions.copy()
+      df_pie["valuation"] = df_pie["valuation"] * PRIVACY_RATIO
+      fig_donut = px.pie(
+          df_pie,
+          values="valuation",
+          names="name",
+          hole=0.6,
+          color_discrete_sequence=[
+              "#38bdf8",
+              "#0284c7",
+              "#0369a1",
+              "#025985",
+              "#075985",
+              "#60a5fa",
+              "#93c5fd",
+          ],
+      )
+      fig_donut.update_layout(
+          margin=dict(t=10, b=10, l=10, r=10),
+          paper_bgcolor="rgba(0,0,0,0)",
+          plot_bgcolor="rgba(0,0,0,0)",
+          font=dict(color="#f8fafc"),
+          showlegend=True,
+      )
+      st.plotly_chart(fig_donut, use_container_width=True)
+
+  with c_g2:
+    st.markdown("#### Plus / Moins-values (€)")
+    if not df_positions.empty:
+      sorted_contrib = df_positions.sort_values(
+          "unrealized_pnl", ascending=True
+      ).copy()
+      sorted_contrib["unrealized_pnl"] = (
+          sorted_contrib["unrealized_pnl"] * PRIVACY_RATIO
+      )
+      bar_colors = [
+          "#10b981" if v >= 0 else "#f43f5e"
+          for v in sorted_contrib["unrealized_pnl"]
+      ]
+
+      fig_contrib = go.Figure(
+          go.Bar(
+              x=sorted_contrib["unrealized_pnl"],
+              y=sorted_contrib["name"],
+              orientation="h",
+              marker=dict(color=bar_colors),
+          )
+      )
+      fig_contrib.update_layout(
+          plot_bgcolor="rgba(0,0,0,0)",
+          paper_bgcolor="rgba(0,0,0,0)",
+          font=dict(color="#94a3b8"),
+          margin=dict(t=10, b=10, l=10, r=10),
+          xaxis=dict(
+              showgrid=True,
+              gridcolor="rgba(255,255,255,0.05)",
+              title="P&L (€)",
+          ),
+          yaxis=dict(showgrid=False, tickfont=dict(color="#f8fafc")),
+      )
+      st.plotly_chart(fig_contrib, use_container_width=True)
+
+  with c_g3:
+    st.markdown("#### Multiples P/E")
+    pe_df = (
+        df_positions.dropna(subset=["pe"])[["name", "pe"]]
+        .sort_values("pe")
+        .copy()
+    )
+    if not pe_df.empty:
+      fig_pe = px.bar(
+          pe_df,
+          x="pe",
+          y="name",
+          orientation="h",
+          color="pe",
+          color_continuous_scale=["#3b82f6", "#1d4ed8"],
+      )
+      fig_pe.update_layout(
+          margin=dict(t=10, b=10, l=10, r=10),
+          height=280,
+          xaxis=dict(
+              gridcolor="rgba(255,255,255,0.05)",
+              title="Ratio P/E",
+              tickfont=dict(family="JetBrains Mono"),
+          ),
+          yaxis=dict(
+              gridcolor="rgba(255,255,255,0.05)",
+              title="",
+              tickfont=dict(color="#f8fafc"),
+          ),
+          plot_bgcolor="rgba(0,0,0,0)",
+          paper_bgcolor="rgba(0,0,0,0)",
+          coloraxis_showscale=False,
+      )
+      st.plotly_chart(fig_pe, use_container_width=True)
+    else:
+      st.caption("Multiples indisponibles sur les lignes actives.")
 
 # ====================================================
 # ONGLET 4 : JOURNAL DES OPÉRATIONS
 # ====================================================
 with tab_journal:
-    st.markdown("#### Journal d'arbitrage et thèses d'investissement")
-    if df_transactions.empty:
-        st.write("Aucune opération répertoriée.")
-    else:
-        journal_view = df_transactions.copy()
-        journal_view["quantity"] = journal_view["quantity"] * PRIVACY_RATIO
-        journal_view = journal_view[[
-            "date",
-            "type",
-            "ticker",
-            "name",
-            "quantity",
-            "price",
-            "fees",
-            "reason",
-            "notes",
-        ]].rename(
-            columns={
-                "date": "Date",
-                "type": "Ordre",
-                "ticker": "Ticker",
-                "name": "Valeur",
-                "quantity": "Quantité",
-                "price": "Prix Unitaire (€)",
-                "fees": "Frais (€)",
-                "reason": "Motif",
-                "notes": "Thèse & Ratios",
-            }
-        )
+  st.markdown("#### Journal d'arbitrage et thèses d'investissement")
+  if df_transactions.empty:
+    st.write("Aucune opération répertoriée.")
+  else:
+    journal_view = df_transactions.copy()
+    journal_view["quantity"] = journal_view["quantity"] * PRIVACY_RATIO
+    journal_view = journal_view[[
+        "date",
+        "type",
+        "ticker",
+        "name",
+        "quantity",
+        "price",
+        "fees",
+        "reason",
+        "notes",
+    ]].rename(
+        columns={
+            "date": "Date",
+            "type": "Ordre",
+            "ticker": "Ticker",
+            "name": "Valeur",
+            "quantity": "Quantité",
+            "price": "Prix Unitaire (€)",
+            "fees": "Frais (€)",
+            "reason": "Motif",
+            "notes": "Thèse & Ratios",
+        }
+    )
 
-        st.dataframe(
-            journal_view.sort_values("Date", ascending=False),
-            use_container_width=True,
-            hide_index=True,
-        )
+    st.dataframe(
+        journal_view.sort_values("Date", ascending=False),
+        use_container_width=True,
+        hide_index=True,
+    )
