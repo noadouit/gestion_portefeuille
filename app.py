@@ -14,84 +14,81 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System Moderne & Épuré
+# Design System Épuré
 st.markdown(
     """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
         html, body, [class*="css"] {
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            background-color: #080c14;
+            background-color: #060911;
             color: #94a3b8;
         }
 
         .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2.5rem;
+            padding-top: 1.8rem;
+            padding-bottom: 3rem;
             max-width: 1440px;
-        }
-
-        /* Cartes & Composants */
-        .glass-card {
-            background: linear-gradient(135deg, rgba(17, 24, 39, 0.7) 0%, rgba(15, 23, 42, 0.5) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .index-pill {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 12px 18px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
         .mono {
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Menu de navigation propre sans hover criard */
+        /* Cartes & Modules */
+        .glass-card {
+            background: #0d1322;
+            border: 1px solid #1a2337;
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+
+        .index-pill {
+            background: #0d1322;
+            border: 1px solid #1a2337;
+            border-radius: 8px;
+            padding: 12px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Suppression stricte des effets de survol moches */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
+            gap: 4px;
             background-color: transparent;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            padding-bottom: 8px;
+            border-bottom: 1px solid #1a2337;
+            padding-bottom: 0px;
             margin-bottom: 2rem;
         }
 
         .stTabs [data-baseweb="tab"] {
-            padding: 8px 18px;
-            border-radius: 8px;
-            background-color: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 8px 16px;
+            background-color: transparent !important;
+            border: none !important;
+            color: #64748b !important;
             font-size: 0.9rem;
             font-weight: 500;
-            color: #94a3b8;
-            transition: color 0.15s ease;
         }
 
         .stTabs [data-baseweb="tab"]:hover {
-            color: #e2e8f0;
-            background-color: rgba(255, 255, 255, 0.04);
-            border-color: rgba(255, 255, 255, 0.08);
+            color: #cbd5e1 !important;
+            background-color: transparent !important;
         }
 
         .stTabs [aria-selected="true"] {
-            background: #1e293b !important;
             color: #38bdf8 !important;
-            border-color: #38bdf8 !important;
             font-weight: 600 !important;
+            border-bottom: 2px solid #38bdf8 !important;
+            border-radius: 0 !important;
         }
 
-        /* Inputs & Sélecteurs */
+        /* Inputs & Formulaires */
         div[data-baseweb="input"], div[data-baseweb="select"] {
-            border-radius: 8px !important;
-            background-color: #0f172a !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
+            border-radius: 6px !important;
+            background-color: #0d1322 !important;
+            border-color: #1a2337 !important;
         }
 
         [data-testid="stMetricValue"] {
@@ -103,10 +100,16 @@ st.markdown(
         button[kind="primary"], .stButton > button {
             background: #2563eb !important;
             border: 1px solid #3b82f6 !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
             font-weight: 600 !important;
-            padding: 10px 20px !important;
         }
+
+        .news-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #1a2337;
+            transition: background 0.1s ease;
+        }
+        .news-item:last-child { border-bottom: none; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -150,6 +153,25 @@ def init_db():
 init_db()
 
 
+def get_french_date():
+  mois = [
+      "janvier",
+      "février",
+      "mars",
+      "avril",
+      "mai",
+      "juin",
+      "juillet",
+      "août",
+      "septembre",
+      "octobre",
+      "novembre",
+      "décembre",
+  ]
+  now = datetime.now()
+  return f"{now.day} {mois[now.month - 1]} {now.year}"
+
+
 @st.cache_data(ttl=900)
 def get_market_indices():
   indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^TNX": "US 10Y Bond"}
@@ -168,6 +190,33 @@ def get_market_indices():
     except Exception:
       out[name] = {"price": 0.0, "change": 0.0}
   return out
+
+
+@st.cache_data(ttl=1800)
+def get_portfolio_news(tickers):
+  news_feed = []
+  for tk_sym in tickers:
+    try:
+      tk = yf.Ticker(tk_sym)
+      for item in tk.news[:3]:
+        pub_time = item.get("providerPublishTime")
+        dt_str = (
+            datetime.fromtimestamp(pub_time).strftime("%d/%m %H:%M")
+            if pub_time
+            else ""
+        )
+        news_feed.append({
+            "ticker": tk_sym,
+            "title": item.get("title"),
+            "publisher": item.get("publisher", "Presse"),
+            "link": item.get("link"),
+            "time": dt_str,
+            "timestamp": pub_time or 0,
+        })
+    except Exception:
+      continue
+  news_feed.sort(key=lambda x: x["timestamp"], reverse=True)
+  return news_feed[:10]
 
 
 def search_yahoo(query):
@@ -332,7 +381,7 @@ with tab_brief:
                         <div style="font-size:0.75rem; font-weight:600; color:#64748b; letter-spacing:0.04em;">{idx_name}</div>
                         <div class="mono" style="font-size:1.15rem; font-weight:700; color:#ffffff; margin-top:2px;">{vals['price']:,.2f}</div>
                     </div>
-                    <div class="mono" style="font-size:0.9rem; font-weight:600; color:{color};">{prefix}{vals['change']:.2f}%</div>
+                    <div class="mono" style="font-size:0.9rem; font-weight:600; color:{color};">{prefix}{vals['change']:.2f} %</div>
                 </div>
             """,
           unsafe_allow_html=True,
@@ -343,8 +392,8 @@ with tab_brief:
         f"""
             <div class="index-pill" style="justify-content:center; text-align:center;">
                 <div>
-                    <div style="font-size:0.75rem; font-weight:600; color:#64748b;">SÉANCE EN COURS</div>
-                    <div style="font-size:0.95rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{datetime.now().strftime('%d %B %Y')}</div>
+                    <div style="font-size:0.75rem; font-weight:600; color:#64748b;">SÉANCE DU JOUR</div>
+                    <div style="font-size:0.95rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{get_french_date()}</div>
                 </div>
             </div>
         """,
@@ -354,10 +403,7 @@ with tab_brief:
   st.write("")
 
   if df_positions.empty:
-    st.info(
-        "Bienvenue. Votre portefeuille est prêt. Enregistrez votre première"
-        " position dans l'onglet 'Portefeuille & Ordres'."
-    )
+    st.info("Aucune position active enregistrée.")
   else:
     cost_basis = df_positions["total_cost"].sum()
     current_val = df_positions["valuation"].sum()
@@ -365,15 +411,15 @@ with tab_brief:
     unrealized_pct = (unrealized / cost_basis * 100) if cost_basis > 0 else 0.0
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Actif Net Réévalué", f"{current_val:,.2f} €")
+    k1.metric("Actif net réévalué", f"{current_val:,.2f} €")
     k2.metric(
-        "Performance Globale",
+        "Performance globale",
         f"{unrealized:+,.2f} €",
         delta=f"{unrealized_pct:+.2f} %",
     )
-    k3.metric("Capital Engagé", f"{cost_basis:,.2f} €")
+    k3.metric("Capital engagé", f"{cost_basis:,.2f} €")
     k4.metric(
-        "Lignes Ouvertes",
+        "Lignes ouvertes",
         f"{len(df_positions):02d}",
         f"{df_positions['sector'].nunique()} secteurs",
     )
@@ -395,11 +441,11 @@ with tab_brief:
                 <div class="glass-card" style="margin-bottom:12px; border-left: 3px solid #10b981;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size:0.8rem; font-weight:700; color:#10b981; letter-spacing:0.04em;">MEILLEURE LIGNE</span>
-                        <span class="mono" style="font-size:0.8rem; color:#64748b;">Poids : {best_pos['weight']:.1f}%</span>
+                        <span class="mono" style="font-size:0.8rem; color:#64748b;">Poids : {best_pos['weight']:.1f} %</span>
                     </div>
                     <div style="font-size:1.15rem; font-weight:700; color:#ffffff; margin: 4px 0;">{best_pos['name']} ({best_pos['ticker']})</div>
                     <div class="mono" style="font-size:0.88rem; color:#cbd5e1;">
-                        Plus-value : <span style="color:#10b981; font-weight:700;">{best_pos['unrealized_pnl_pct']:+.2f}%</span> ({best_pos['unrealized_pnl']:+,.2f} €)
+                        Plus-value : <span style="color:#10b981; font-weight:700;">{best_pos['unrealized_pnl_pct']:+.2f} %</span> ({best_pos['unrealized_pnl']:+,.2f} €)
                     </div>
                 </div>
 
@@ -410,14 +456,14 @@ with tab_brief:
                     </div>
                     <div style="font-size:1.15rem; font-weight:700; color:#ffffff; margin: 4px 0;">{worst_pos['name']} ({worst_pos['ticker']})</div>
                     <div class="mono" style="font-size:0.88rem; color:#cbd5e1;">
-                        Performance : <span style="color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; font-weight:700;">{worst_pos['unrealized_pnl_pct']:+.2f}%</span> ({worst_pos['unrealized_pnl']:+,.2f} €)
+                        Performance : <span style="color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; font-weight:700;">{worst_pos['unrealized_pnl_pct']:+.2f} %</span> ({worst_pos['unrealized_pnl']:+,.2f} €)
                     </div>
                 </div>
             """,
           unsafe_allow_html=True,
       )
 
-      st.markdown("#### Derniers Arbitrages")
+      st.markdown("#### Derniers arbitrages")
       recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
       for _, tx in recent_tx.iterrows():
         badge_bg = (
@@ -439,7 +485,7 @@ with tab_brief:
                             <div style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">Thèse : {tx['reason'] or 'Arbitrage de gestion'}</div>
                         </div>
                         <div class="mono" style="text-align:right;">
-                            <div style="font-size:0.9rem; font-weight:600; color:#ffffff;">{tx['quantity']} @ {tx['price']:.2f} €</div>
+                            <div style="font-size:0.9rem; font-weight:600; color:#ffffff;">{tx['quantity']} × {tx['price']:.2f} €</div>
                             <div style="font-size:0.75rem; color:#64748b;">{tx['date']}</div>
                         </div>
                     </div>
@@ -484,6 +530,37 @@ with tab_brief:
       else:
         st.caption("Données de multiples indisponibles.")
 
+    # ----------------------------------------------------
+    # BANDEAU D'ACTUALITÉS EN DIRECT
+    # ----------------------------------------------------
+    st.write("")
+    st.markdown("#### Actualités des entreprises en portefeuille")
+    active_tickers = df_positions["ticker"].tolist()
+    news_items = get_portfolio_news(active_tickers)
+
+    if news_items:
+      st.markdown('<div class="glass-card" style="padding:4px 0;">', unsafe_allow_html=True)
+      for item in news_items:
+        st.markdown(
+            f"""
+                <div class="news-item">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <span class="mono" style="font-size:0.75rem; font-weight:700; color:#38bdf8;">{item['ticker']}</span>
+                        <span class="mono" style="font-size:0.75rem; color:#64748b;">{item['publisher']} • {item['time']}</span>
+                    </div>
+                    <div style="margin-top:4px;">
+                        <a href="{item['link']}" target="_blank" style="color:#f1f5f9; text-decoration:none; font-weight:600; font-size:0.92rem;">
+                            {item['title']}
+                        </a>
+                    </div>
+                </div>
+            """,
+            unsafe_allow_html=True,
+        )
+      st.markdown('</div>', unsafe_allow_html=True)
+    else:
+      st.caption("Aucune dépêche récente identifiée sur vos lignes.")
+
 # ====================================================
 # ONGLET 2 : PORTEFEUILLE & ORDRES
 # ====================================================
@@ -491,10 +568,10 @@ with tab_holdings:
   col_saisie, col_table = st.columns([1, 2], gap="large")
 
   with col_saisie:
-    st.markdown("#### Nouvel Ordre")
+    st.markdown("#### Nouvel ordre")
     search_input = st.text_input(
         "Rechercher un actif",
-        placeholder="Nom d'entreprise ou ticker (ex: Alstom, Eiffage)...",
+        placeholder="Nom d'entreprise ou ticker...",
     )
     search_results = search_yahoo(search_input)
 
@@ -593,7 +670,7 @@ with tab_holdings:
           st.rerun()
 
   with col_table:
-    st.markdown("#### Positions Ouvertes")
+    st.markdown("#### Positions ouvertes")
     if df_positions.empty:
       st.write("Aucune position active.")
     else:
@@ -638,13 +715,12 @@ with tab_holdings:
       )
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE, TWR & SÉLECTEUR DE TIMELINE
+# ONGLET 3 : PERFORMANCE & TWR (EN POURCENTAGE %)
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
     st.info("Données insuffisantes pour générer la performance.")
   else:
-    # Barre de sélection de la période
     timeline_options = [
         "1J",
         "5J",
@@ -660,7 +736,7 @@ with tab_analytics:
     selected_period = st.radio(
         "Période d'analyse",
         timeline_options,
-        index=9,  # MAX par défaut
+        index=9,
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -668,7 +744,6 @@ with tab_analytics:
     first_tx_date = pd.to_datetime(df_transactions["date"].min())
     now_date = datetime.now()
 
-    # Calcul de la date de départ selon la période
     period_deltas = {
         "1J": timedelta(days=2),
         "5J": timedelta(days=7),
@@ -689,7 +764,7 @@ with tab_analytics:
 
     tickers_list = df_transactions["ticker"].unique().tolist()
 
-    with st.spinner("Calcul de la performance financière..."):
+    with st.spinner("Calcul de la rentabilité financière..."):
       tickers_with_bench = tickers_list + ["^FCHI"]
       raw_prices = yf.download(
           tickers_with_bench, start=query_start_date, progress=False
@@ -698,7 +773,6 @@ with tab_analytics:
         raw_prices = raw_prices.to_frame(name=tickers_with_bench[0])
       raw_prices = raw_prices.ffill().bfill()
 
-      # Filtrage des jours ouvrés sur la période active
       trading_days = [d for d in raw_prices.index if d >= query_start_date]
 
       twr_records = []
@@ -746,47 +820,57 @@ with tab_analytics:
 
         twr_records.append({
             "Date": d,
-            "TWR_Index": cumulative_twr * 100.0,
-            "Portfolio_Value": end_val,
+            "TWR_Raw": cumulative_twr,
             "Benchmark_Close": bench_close,
         })
 
       df_twr = pd.DataFrame(twr_records)
 
-      # Ré-étalonnage de la base 100 au premier jour de la sélection
+      # Calcul de la performance en % net par rapport au début de période
       if not df_twr.empty:
-        base_twr = df_twr["TWR_Index"].iloc[0]
-        df_twr["TWR_Index"] = (df_twr["TWR_Index"] / base_twr) * 100.0
+        base_twr = df_twr["TWR_Raw"].iloc[0]
+        df_twr["Portfolio_Return_Pct"] = (
+            (df_twr["TWR_Raw"] / base_twr) - 1.0
+        ) * 100.0
 
         if "^FCHI" in raw_prices.columns and df_twr["Benchmark_Close"].iloc[0] > 0:
           base_bench = df_twr["Benchmark_Close"].iloc[0]
-          df_twr["Benchmark_Index"] = (
-              df_twr["Benchmark_Close"] / base_bench
+          df_twr["CAC_Return_Pct"] = (
+              (df_twr["Benchmark_Close"] / base_bench) - 1.0
           ) * 100.0
 
-      # Graphique TWR
+      # Graphique en %
+      st.markdown("#### Performance cumulée (%)")
+      st.caption(
+          "Rendement pondéré dans le temps (TWR) neutralisant les flux"
+          " d'apports et de retraits."
+      )
+
       fig_twr = go.Figure()
       fig_twr.add_trace(
           go.Scatter(
               x=df_twr["Date"],
-              y=df_twr["TWR_Index"],
+              y=df_twr["Portfolio_Return_Pct"],
               mode="lines",
               name="Portefeuille",
               line=dict(color="#38bdf8", width=2.4),
-              fill="tozeroy",
-              fillcolor="rgba(56, 189, 248, 0.04)",
           )
       )
       if "^FCHI" in raw_prices.columns:
         fig_twr.add_trace(
             go.Scatter(
                 x=df_twr["Date"],
-                y=df_twr["Benchmark_Index"],
+                y=df_twr["CAC_Return_Pct"],
                 mode="lines",
                 name="CAC 40",
                 line=dict(color="#64748b", width=1.5, dash="dot"),
             )
         )
+
+      # Ligne zéro repère
+      fig_twr.add_hline(
+          y=0, line_dash="solid", line_color="rgba(255,255,255,0.15)", line_width=1
+      )
 
       fig_twr.update_layout(
           hovermode="x unified",
@@ -798,7 +882,8 @@ with tab_analytics:
           yaxis=dict(
               showgrid=True,
               gridcolor="rgba(255,255,255,0.05)",
-              title="Indice (Base 100)",
+              title="Rendement (%)",
+              ticksuffix=" %",
           ),
           legend=dict(
               orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
@@ -810,7 +895,7 @@ with tab_analytics:
     c_g1, c_g2 = st.columns(2, gap="large")
 
     with c_g1:
-      st.markdown("#### Structure du Capital (Donut)")
+      st.markdown("#### Structure du capital (Donut)")
       if not df_positions.empty:
         fig_donut = px.pie(
             df_positions,
@@ -835,7 +920,7 @@ with tab_analytics:
         st.plotly_chart(fig_donut, use_container_width=True)
 
     with c_g2:
-      st.markdown("#### Plus / Moins-values par Ligne (€)")
+      st.markdown("#### Plus / Moins-values par ligne (€)")
       if not df_positions.empty:
         sorted_contrib = df_positions.sort_values(
             "unrealized_pnl", ascending=True
@@ -871,7 +956,7 @@ with tab_analytics:
 # ONGLET 4 : JOURNAL DES OPÉRATIONS
 # ====================================================
 with tab_journal:
-  st.markdown("#### Journal d'Arbitrage et Thèses d'Investissement")
+  st.markdown("#### Journal d'arbitrage et thèses d'investissement")
   if df_transactions.empty:
     st.write("Aucune opération répertoriée.")
   else:
