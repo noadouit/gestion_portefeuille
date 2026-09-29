@@ -27,7 +27,7 @@ if "authenticated" not in st.session_state:
 if "trigger_hacker_fx" not in st.session_state:
     st.session_state["trigger_hacker_fx"] = False
 
-# Animation Hacker longue (~4.8s) avec séquence cinéma
+# Animation Hacker longue (~4.8s)
 if st.session_state.get("trigger_hacker_fx", False):
     st.session_state["trigger_hacker_fx"] = False
     st.markdown(
@@ -164,219 +164,6 @@ if st.session_state.get("trigger_hacker_fx", False):
 
 is_real_mode = st.session_state["authenticated"]
 PRIVACY_RATIO = 1.0 if is_real_mode else 0.25
-
-# Design System de l'application
-st.markdown(
-    """
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-        html, body, [class*="css"] {
-            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            background-color: #060911;
-            color: #94a3b8;
-        }
-
-        .block-container {
-            padding-top: 3.5rem !important;
-            padding-bottom: 2.5rem !important;
-            max-width: 1540px;
-        }
-
-        header[data-testid="stHeader"] {
-            background-color: rgba(6, 9, 17, 0.85) !important;
-            backdrop-filter: blur(8px);
-        }
-
-        .mono {
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .brand-title {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 2.2rem;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-transform: uppercase;
-        }
-
-        .mode-indicator {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 4px;
-            letter-spacing: 0.05em;
-        }
-        .mode-real {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-        .mode-demo {
-            background: rgba(245, 158, 11, 0.15);
-            color: #f59e0b;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .glass-card {
-            background: #0d1322;
-            border: 1px solid #1a2337;
-            border-radius: 8px;
-            padding: 14px 16px;
-        }
-
-        .index-pill {
-            background: #0d1322;
-            border: 1px solid #1a2337;
-            border-radius: 8px;
-            padding: 10px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        div[data-baseweb="tab-list"] {
-            gap: 16px !important;
-            background-color: transparent !important;
-            border-bottom: 1px solid #1a2337 !important;
-            padding-bottom: 4px !important;
-            margin-bottom: 1.6rem !important;
-        }
-
-        div[data-baseweb="tab-list"] button,
-        div[data-baseweb="tab"] {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            outline: none !important;
-            color: #64748b !important;
-            font-size: 0.92rem !important;
-            font-weight: 500 !important;
-            padding: 8px 6px !important;
-        }
-
-        div[data-baseweb="tab-list"] button:hover,
-        div[data-baseweb="tab"]:hover {
-            color: #e2e8f0 !important;
-            background: transparent !important;
-        }
-
-        div[data-baseweb="tab-list"] button[aria-selected="true"],
-        div[data-baseweb="tab"][aria-selected="true"] {
-            color: #38bdf8 !important;
-            font-weight: 700 !important;
-            border-bottom: 2px solid #38bdf8 !important;
-            border-radius: 0 !important;
-        }
-
-        .custom-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-        .custom-table th {
-            color: #64748b;
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 14px 18px;
-            text-align: left;
-            border-bottom: 1px solid #1a2337;
-        }
-        .custom-table td {
-            padding: 14px 18px;
-            font-size: 0.9rem;
-            border-bottom: 1px solid #0f172a;
-            color: #f1f5f9;
-        }
-        .custom-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .badge-sector {
-            background: rgba(56, 189, 248, 0.1);
-            color: #38bdf8;
-            font-size: 0.72rem;
-            font-weight: 600;
-            padding: 2px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .badge-pos {
-            color: #10b981;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-        }
-        .badge-neg {
-            color: #f43f5e;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-        }
-
-        .news-container {
-            max-height: 290px;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #1a2337 transparent;
-        }
-        .news-item {
-            padding: 10px 12px;
-            border-bottom: 1px solid #1a2337;
-        }
-        .news-item:last-child { border-bottom: none; }
-
-        div[data-baseweb="input"], div[data-baseweb="select"] {
-            border-radius: 6px !important;
-            background-color: #0d1322 !important;
-            border-color: #1a2337 !important;
-        }
-
-        [data-testid="stMetricValue"] {
-            font-size: 1.65rem !important;
-            font-weight: 700 !important;
-            color: #ffffff !important;
-        }
-
-        button[kind="primary"], .stButton > button {
-            background: #2563eb !important;
-            border: 1px solid #3b82f6 !important;
-            border-radius: 6px !important;
-            font-weight: 600 !important;
-        }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
-
-# Header direct avec contrôle déverrouillage
-col_title, col_auth = st.columns([3.5, 1.5])
-
-with col_title:
-    st.markdown('<span class="brand-title">Asset Management</span>', unsafe_allow_html=True)
-
-with col_auth:
-    if not is_real_mode:
-        with st.expander("🔒 Déverrouiller (Mode Démo)", expanded=False):
-            pwd_try = st.text_input("Mot de passe", type="password", key="pwd_top_input")
-            if st.button("Afficher vraies valeurs", use_container_width=True):
-                if pwd_try == REAL_DATA_PASSWORD:
-                    st.session_state["authenticated"] = True
-                    st.session_state["trigger_hacker_fx"] = True
-                    st.rerun()
-                else:
-                    st.error("Mot de passe incorrect")
-    else:
-        st.markdown('<span class="mode-indicator mode-real">VALEURS RÉELLES</span>', unsafe_allow_html=True)
-        if st.button("Masquer (Mode Démo)", use_container_width=True):
-            st.session_state["authenticated"] = False
-            st.rerun()
-
-st.markdown('<div style="margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);"></div>', unsafe_allow_html=True)
 
 DB_PATH = "portfolio.db"
 
@@ -869,6 +656,255 @@ def get_portfolio_data():
 
 
 df_positions, df_transactions = get_portfolio_data()
+
+# Calcul de la performance journalière (1J) pondérée
+if not df_positions.empty and df_positions["valuation"].sum() > 0:
+    day_perf_global = (
+        df_positions["valuation"] * df_positions["day_change"]
+    ).sum() / df_positions["valuation"].sum()
+else:
+    day_perf_global = -0.56
+
+day_badge_color = "#10b981" if day_perf_global >= 0 else "#f43f5e"
+day_badge_bg = "rgba(16, 185, 129, 0.12)" if day_perf_global >= 0 else "rgba(244, 63, 94, 0.12)"
+day_badge_border = "rgba(16, 185, 129, 0.3)" if day_perf_global >= 0 else "rgba(244, 63, 94, 0.3)"
+day_arrow = "▲" if day_perf_global > 0 else ("▼" if day_perf_global < 0 else "■")
+
+# Design System de l'application
+st.markdown(
+    """
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        html, body, [class*="css"] {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background-color: #060911;
+            color: #94a3b8;
+        }
+
+        .block-container {
+            padding-top: 3.5rem !important;
+            padding-bottom: 2.5rem !important;
+            max-width: 1540px;
+        }
+
+        header[data-testid="stHeader"] {
+            background-color: rgba(6, 9, 17, 0.85) !important;
+            backdrop-filter: blur(8px);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .brand-title {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+
+        .day-perf-pill {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.02em;
+        }
+
+        .mode-indicator {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+        }
+        .mode-real {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .mode-demo {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .glass-card {
+            background: #0d1322;
+            border: 1px solid #1a2337;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+
+        .index-pill {
+            background: #0d1322;
+            border: 1px solid #1a2337;
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        div[data-baseweb="tab-list"] {
+            gap: 16px !important;
+            background-color: transparent !important;
+            border-bottom: 1px solid #1a2337 !important;
+            padding-bottom: 4px !important;
+            margin-bottom: 1.6rem !important;
+        }
+
+        div[data-baseweb="tab-list"] button,
+        div[data-baseweb="tab"] {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            color: #64748b !important;
+            font-size: 0.92rem !important;
+            font-weight: 500 !important;
+            padding: 8px 6px !important;
+        }
+
+        div[data-baseweb="tab-list"] button:hover,
+        div[data-baseweb="tab"]:hover {
+            color: #e2e8f0 !important;
+            background: transparent !important;
+        }
+
+        div[data-baseweb="tab-list"] button[aria-selected="true"],
+        div[data-baseweb="tab"][aria-selected="true"] {
+            color: #38bdf8 !important;
+            font-weight: 700 !important;
+            border-bottom: 2px solid #38bdf8 !important;
+            border-radius: 0 !important;
+        }
+
+        .custom-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .custom-table th {
+            color: #64748b;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 14px 18px;
+            text-align: left;
+            border-bottom: 1px solid #1a2337;
+        }
+        .custom-table td {
+            padding: 14px 18px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #0f172a;
+            color: #f1f5f9;
+        }
+        .custom-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge-sector {
+            background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .badge-pos {
+            color: #10b981;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+        .badge-neg {
+            color: #f43f5e;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        .news-container {
+            max-height: 290px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #1a2337 transparent;
+        }
+        .news-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #1a2337;
+        }
+        .news-item:last-child { border-bottom: none; }
+
+        div[data-baseweb="input"], div[data-baseweb="select"] {
+            border-radius: 6px !important;
+            background-color: #0d1322 !important;
+            border-color: #1a2337 !important;
+        }
+
+        [data-testid="stMetricValue"] {
+            font-size: 1.65rem !important;
+            font-weight: 700 !important;
+            color: #ffffff !important;
+        }
+
+        button[kind="primary"], .stButton > button {
+            background: #2563eb !important;
+            border: 1px solid #3b82f6 !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+        }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+# Header direct avec titre + PERFORMANCE DU JOUR + contrôle déverrouillage
+col_title, col_auth = st.columns([3.8, 1.2])
+
+with col_title:
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;">
+            <span class="brand-title">Asset Management</span>
+            <div class="day-perf-pill" style="background:{day_badge_bg}; color:{day_badge_color}; border:1px solid {day_badge_border};">
+                <span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase;">1J</span>
+                <span>{day_arrow} {day_perf_global:+.2f} %</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col_auth:
+    if not is_real_mode:
+        with st.expander("🔒 Déverrouiller (Mode Démo)", expanded=False):
+            pwd_try = st.text_input("Mot de passe", type="password", key="pwd_top_input")
+            if st.button("Afficher vraies valeurs", use_container_width=True):
+                if pwd_try == REAL_DATA_PASSWORD:
+                    st.session_state["authenticated"] = True
+                    st.session_state["trigger_hacker_fx"] = True
+                    st.rerun()
+                else:
+                    st.error("Mot de passe incorrect")
+    else:
+        st.markdown('<span class="mode-indicator mode-real">VALEURS RÉELLES</span>', unsafe_allow_html=True)
+        if st.button("Masquer (Mode Démo)", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.rerun()
+
+st.markdown('<div style="margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);"></div>', unsafe_allow_html=True)
 
 # Navigation principale
 tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
@@ -1374,15 +1410,8 @@ with tab_analytics:
 
     if selected_period == "1J":
         st.markdown("#### Performance de la séance (1J)")
-        if not df_positions.empty and df_positions["valuation"].sum() > 0:
-            day_perf_pct = (
-                df_positions["valuation"] * df_positions["day_change"]
-            ).sum() / df_positions["valuation"].sum()
-        else:
-            day_perf_pct = -0.56
-
         st.caption(
-            f"Séance du jour : Performance globale estimée à {day_perf_pct:+.2f} %"
+            f"Séance du jour : Performance globale estimée à {day_perf_global:+.2f} %"
         )
 
         try:
@@ -1399,7 +1428,7 @@ with tab_analytics:
                 n_pts = len(cac_curve)
                 weight_range = pd.Series(range(n_pts), index=times) / max(1, n_pts - 1)
                 port_curve = (
-                    cac_curve * 0.8 + (day_perf_pct - cac_curve.iloc[-1]) * weight_range
+                    cac_curve * 0.8 + (day_perf_global - cac_curve.iloc[-1]) * weight_range
                 )
 
                 fig_1j = go.Figure()
@@ -1408,7 +1437,7 @@ with tab_analytics:
                         x=times,
                         y=port_curve,
                         mode="lines",
-                        name=f"Portefeuille ({day_perf_pct:+.2f}%)",
+                        name=f"Portefeuille ({day_perf_global:+.2f}%)",
                         line=dict(color="#38bdf8", width=2.4),
                     )
                 )
