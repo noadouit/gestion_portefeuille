@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
+import xml.etree.ElementTree as ET
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -14,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System & Neutralisation stricte des effets de survol Streamlit
+# Design System & Dégagement menu haut
 st.markdown(
     """
     <style>
@@ -26,22 +27,27 @@ st.markdown(
             color: #94a3b8;
         }
 
+        /* Dégagement massif pour ne jamais couper le menu sous la barre Streamlit */
         .block-container {
-            padding-top: 1.8rem;
-            padding-bottom: 3rem;
+            padding-top: 5.5rem !important;
+            padding-bottom: 3.5rem;
             max-width: 1440px;
+        }
+
+        header[data-testid="stHeader"] {
+            background-color: rgba(6, 9, 17, 0.85) !important;
+            backdrop-filter: blur(8px);
         }
 
         .mono {
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Cartes & Modules */
         .glass-card {
             background: #0d1322;
             border: 1px solid #1a2337;
             border-radius: 10px;
-            padding: 16px 20px;
+            padding: 18px 22px;
         }
 
         .index-pill {
@@ -54,55 +60,88 @@ st.markdown(
             align-items: center;
         }
 
-        /* NEUTRALISATION ABSOLUE DU SURVOL DES ONGLETS */
+        /* Onglets avec visibilité totale */
         div[data-baseweb="tab-list"] {
-            gap: 12px !important;
+            gap: 16px !important;
             background-color: transparent !important;
             border-bottom: 1px solid #1a2337 !important;
-            padding-bottom: 0px !important;
+            padding-bottom: 4px !important;
             margin-bottom: 2rem !important;
         }
 
         div[data-baseweb="tab-list"] button,
         div[data-baseweb="tab"] {
             background: transparent !important;
-            background-color: transparent !important;
             border: none !important;
             box-shadow: none !important;
             outline: none !important;
             color: #64748b !important;
-            font-size: 0.92rem !important;
+            font-size: 0.95rem !important;
             font-weight: 500 !important;
-            padding: 10px 14px !important;
-            transition: color 0.15s ease !important;
+            padding: 8px 6px !important;
         }
 
-        /* Aucun changement de fond au passage de la souris */
         div[data-baseweb="tab-list"] button:hover,
-        div[data-baseweb="tab"]:hover,
-        div[data-baseweb="tab-list"] button:focus,
-        div[data-baseweb="tab"]:focus,
-        div[data-baseweb="tab-list"] button:active,
-        div[data-baseweb="tab"]:active {
-            background: transparent !important;
-            background-color: transparent !important;
+        div[data-baseweb="tab"]:hover {
             color: #e2e8f0 !important;
-            box-shadow: none !important;
-            border: none !important;
+            background: transparent !important;
         }
 
-        /* Onglet sélectionné : simple soulignement cyan élégant */
         div[data-baseweb="tab-list"] button[aria-selected="true"],
         div[data-baseweb="tab"][aria-selected="true"] {
-            background: transparent !important;
-            background-color: transparent !important;
             color: #38bdf8 !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
             border-bottom: 2px solid #38bdf8 !important;
             border-radius: 0 !important;
         }
 
-        /* Inputs & Formulaires */
+        /* Table de positions sur-mesure */
+        .custom-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 10px;
+        }
+        .custom-table th {
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid #1a2337;
+        }
+        .custom-table td {
+            padding: 14px 14px;
+            font-size: 0.88rem;
+            border-bottom: 1px solid #0f172a;
+            color: #f1f5f9;
+        }
+        .custom-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge-sector {
+            background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .badge-pos {
+            color: #10b981;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+        .badge-neg {
+            color: #f43f5e;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
         div[data-baseweb="input"], div[data-baseweb="select"] {
             border-radius: 6px !important;
             background-color: #0d1322 !important;
@@ -178,7 +217,6 @@ init_db()
 
 
 def record_hourly_prices(live_quotes):
-  """Enregistre le cours de chaque actif toutes les heures en base SQLite."""
   current_slot = datetime.now().strftime("%Y-%m-%d %H:00:00")
   with get_connection() as conn:
     cur = conn.cursor()
@@ -234,31 +272,32 @@ def get_market_indices():
   return out
 
 
-@st.cache_data(ttl=1800)
-def get_portfolio_news(tickers):
-  news_feed = []
-  for tk_sym in tickers:
+@st.cache_data(ttl=900)
+def get_portfolio_news_rss(tickers):
+  """Scraping direct via flux RSS Yahoo Finance (résistant au blocage)."""
+  news = []
+  headers = {"User-Agent": "Mozilla/5.0"}
+  for tk in tickers:
+    url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={tk}&region=FR&lang=fr-FR"
     try:
-      tk = yf.Ticker(tk_sym)
-      for item in tk.news[:3]:
-        pub_time = item.get("providerPublishTime")
-        dt_str = (
-            datetime.fromtimestamp(pub_time).strftime("%d/%m %H:%M")
-            if pub_time
-            else ""
-        )
-        news_feed.append({
-            "ticker": tk_sym,
-            "title": item.get("title"),
-            "publisher": item.get("publisher", "Presse"),
-            "link": item.get("link"),
-            "time": dt_str,
-            "timestamp": pub_time or 0,
-        })
+      resp = requests.get(url, headers=headers, timeout=4)
+      if resp.status_code == 200:
+        root = ET.fromstring(resp.content)
+        items = root.findall("./channel/item")
+        for it in items[:3]:
+          title = it.findtext("title", "")
+          link = it.findtext("link", "")
+          pub_date = it.findtext("pubDate", "")
+          if title and link:
+            news.append({
+                "ticker": tk,
+                "title": title,
+                "link": link,
+                "pubDate": pub_date[:16] if pub_date else "",
+            })
     except Exception:
       continue
-  news_feed.sort(key=lambda x: x["timestamp"], reverse=True)
-  return news_feed[:10]
+  return news[:8]
 
 
 def search_yahoo(query):
@@ -297,7 +336,7 @@ def fetch_live_quotes(tickers):
           "price": float(p),
           "pe": info.get("trailingPE"),
           "yield": (info.get("dividendYield") or 0.0) * 100,
-          "sector": info.get("sector") or "Non classé",
+          "sector": info.get("sector") or "Industrie & Services",
           "day_change": info.get("regularMarketChangePercent", 0.0),
       }
     except Exception:
@@ -305,7 +344,7 @@ def fetch_live_quotes(tickers):
           "price": 0.0,
           "pe": None,
           "yield": 0.0,
-          "sector": "Non classé",
+          "sector": "Industrie & Services",
           "day_change": 0.0,
       }
   return quotes
@@ -359,8 +398,6 @@ def get_portfolio_data():
 
   df_pos = pd.DataFrame(active)
   live = fetch_live_quotes(df_pos["ticker"].tolist())
-
-  # Déclenchement automatique de la capture horaire
   record_hourly_prices(live)
 
   df_pos["pru"] = df_pos["total_cost"] / df_pos["quantity"]
@@ -575,10 +612,13 @@ with tab_brief:
       else:
         st.caption("Données de multiples indisponibles.")
 
+    # ----------------------------------------------------
+    # BANDEAU D'ACTUALITÉS RSS GARANTI
+    # ----------------------------------------------------
     st.write("")
-    st.markdown("#### Actualités des entreprises en portefeuille")
+    st.markdown("#### Actualités financières des lignes détenues")
     active_tickers = df_positions["ticker"].tolist()
-    news_items = get_portfolio_news(active_tickers)
+    news_items = get_portfolio_news_rss(active_tickers)
 
     if news_items:
       st.markdown('<div class="glass-card" style="padding:4px 0;">', unsafe_allow_html=True)
@@ -588,10 +628,10 @@ with tab_brief:
                 <div class="news-item">
                     <div style="display:flex; justify-content:space-between; align-items:baseline;">
                         <span class="mono" style="font-size:0.75rem; font-weight:700; color:#38bdf8;">{item['ticker']}</span>
-                        <span class="mono" style="font-size:0.75rem; color:#64748b;">{item['publisher']} • {item['time']}</span>
+                        <span class="mono" style="font-size:0.75rem; color:#64748b;">{item['pubDate']}</span>
                     </div>
                     <div style="margin-top:4px;">
-                        <a href="{item['link']}" target="_blank" style="color:#f1f5f9; text-decoration:none; font-weight:600; font-size:0.92rem;">
+                        <a href="{item['link']}" target="_blank" rel="noopener noreferrer" style="color:#f1f5f9; text-decoration:none; font-weight:600; font-size:0.92rem;">
                             {item['title']}
                         </a>
                     </div>
@@ -601,10 +641,10 @@ with tab_brief:
         )
       st.markdown('</div>', unsafe_allow_html=True)
     else:
-      st.caption("Aucune dépêche récente identifiée sur vos lignes.")
+      st.caption("Flux d'actualités en synchronisation sur les places financières...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE & ORDRES
+# ONGLET 2 : PORTEFEUILLE & ORDRES (TABLEAU VISUEL REFONDU)
 # ====================================================
 with tab_holdings:
   col_saisie, col_table = st.columns([1, 2], gap="large")
@@ -613,7 +653,7 @@ with tab_holdings:
     st.markdown("#### Nouvel ordre")
     search_input = st.text_input(
         "Rechercher un actif",
-        placeholder="Nom d'entreprise ou ticker...",
+        placeholder="Nom ou ticker...",
     )
     search_results = search_yahoo(search_input)
 
@@ -662,7 +702,7 @@ with tab_holdings:
 
       if submit:
         if not selected_asset:
-          st.error("Sélectionnez une valeur avant de valider l'ordre.")
+          st.error("Sélectionnez une valeur avant de valider.")
         else:
           type_code = (
               "BUY"
@@ -708,7 +748,7 @@ with tab_holdings:
             )
             conn.commit()
 
-          st.success(f"Opération enregistrée sur {selected_asset['name']}.")
+          st.success(f"Opération enregistrée pour {selected_asset['name']}.")
           st.rerun()
 
   with col_table:
@@ -716,48 +756,57 @@ with tab_holdings:
     if df_positions.empty:
       st.write("Aucune position active.")
     else:
-      view_df = df_positions[[
-          "ticker",
-          "name",
-          "sector",
-          "quantity",
-          "pru",
-          "current_price",
-          "valuation",
-          "unrealized_pnl",
-          "unrealized_pnl_pct",
-          "weight",
-      ]].rename(
-          columns={
-              "ticker": "Ticker",
-              "name": "Actif",
-              "sector": "Secteur",
-              "quantity": "Quantité",
-              "pru": "PRU",
-              "current_price": "Cours",
-              "valuation": "Valorisation",
-              "unrealized_pnl": "P&L (€)",
-              "unrealized_pnl_pct": "P&L (%)",
-              "weight": "Poids",
-          }
-      )
+      # Rendu du tableau stylisé sur-mesure
+      rows_html = ""
+      for _, pos in df_positions.iterrows():
+        pnl_class = "badge-pos" if pos["unrealized_pnl"] >= 0 else "badge-neg"
+        prefix = "+" if pos["unrealized_pnl"] >= 0 else ""
+        rows_html += f"""
+                <tr>
+                    <td>
+                        <div style="font-weight:700; color:#ffffff;">{pos['name']}</div>
+                        <span class="mono" style="font-size:0.75rem; color:#64748b;">{pos['ticker']}</span>
+                    </td>
+                    <td><span class="badge-sector">{pos['sector']}</span></td>
+                    <td class="mono">{pos['quantity']:.2f}</td>
+                    <td class="mono" style="color:#94a3b8;">{pos['pru']:.2f} €</td>
+                    <td class="mono" style="font-weight:600; color:#f1f5f9;">{pos['current_price']:.2f} €</td>
+                    <td class="mono" style="font-weight:700; color:#ffffff;">{pos['valuation']:,.2f} €</td>
+                    <td class="{pnl_class}">
+                        {prefix}{pos['unrealized_pnl']:+,.2f} €<br>
+                        <span style="font-size:0.75rem;">({prefix}{pos['unrealized_pnl_pct']:.2f} %)</span>
+                    </td>
+                    <td class="mono" style="color:#64748b;">{pos['weight']:.1f} %</td>
+                </tr>
+                """
 
-      st.dataframe(
-          view_df.style.format({
-              "Quantité": "{:.2f}",
-              "PRU": "{:.2f} €",
-              "Cours": "{:.2f} €",
-              "Valorisation": "{:,.2f} €",
-              "P&L (€)": "{:+,.2f} €",
-              "P&L (%)": "{:+.2f} %",
-              "Poids": "{:.1f} %",
-          }),
-          use_container_width=True,
-          hide_index=True,
+      st.markdown(
+          f"""
+            <div class="glass-card" style="padding:0px; overflow-x:auto;">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Actif</th>
+                            <th>Secteur</th>
+                            <th>Quantité</th>
+                            <th>PRU</th>
+                            <th>Cours</th>
+                            <th>Valorisation</th>
+                            <th>Plus/Moins-value</th>
+                            <th>Poids</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+            """,
+          unsafe_allow_html=True,
       )
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE & TWR (AVEC INTÉGRATION HORAIRE)
+# ONGLET 3 : PERFORMANCE & TWR (ÉCHELLE STRICTE 09h00 - 17h35)
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
@@ -778,7 +827,7 @@ with tab_analytics:
     selected_period = st.radio(
         "Période d'analyse",
         timeline_options,
-        index=9,
+        index=0,  # 1J par défaut
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -787,8 +836,8 @@ with tab_analytics:
     now_date = datetime.now()
 
     period_deltas = {
-        "1J": timedelta(days=1),
-        "5J": timedelta(days=5),
+        "1J": timedelta(days=2),
+        "5J": timedelta(days=7),
         "1M": timedelta(days=30),
         "3M": timedelta(days=90),
         "6M": timedelta(days=180),
@@ -798,19 +847,22 @@ with tab_analytics:
         "10A": timedelta(days=365 * 10),
     }
 
+    is_intraday = selected_period == "1J"
+    interval = "5m" if is_intraday else ("60m" if selected_period == "5J" else "1d")
+
     if selected_period == "MAX":
       query_start_date = first_tx_date - timedelta(days=5)
+    elif is_intraday:
+      # Prise de la dernière journée boursière ouverte
+      query_start_date = now_date - timedelta(days=3)
     else:
       calculated_start = now_date - period_deltas[selected_period]
       query_start_date = max(first_tx_date - timedelta(days=5), calculated_start)
 
     tickers_list = df_transactions["ticker"].unique().tolist()
-    use_hourly = selected_period in ["1J", "5J"]
 
     with st.spinner("Calcul de la rentabilité financière..."):
       tickers_with_bench = tickers_list + ["^FCHI"]
-      interval = "60m" if use_hourly else "1d"
-
       raw_prices = yf.download(
           tickers_with_bench,
           start=query_start_date,
@@ -821,13 +873,15 @@ with tab_analytics:
         raw_prices = raw_prices.to_frame(name=tickers_with_bench[0])
       raw_prices = raw_prices.ffill().bfill()
 
-      # Conversion timezone pour alignement
       if hasattr(raw_prices.index, "tz") and raw_prices.index.tz is not None:
-        raw_prices.index = raw_prices.index.tz_convert(None)
+        raw_prices.index = raw_prices.index.tz_convert("Europe/Paris").tz_localize(None)
 
-      trading_points = [
-          pt for pt in raw_prices.index if pt >= pd.to_datetime(query_start_date)
-      ]
+      # Filtrage spécifique pour 1J : retenir uniquement la dernière date de trading
+      if is_intraday and not raw_prices.empty:
+        last_trading_day = raw_prices.index[-1].date()
+        raw_prices = raw_prices[raw_prices.index.date == last_trading_day]
+
+      trading_points = raw_prices.index.tolist()
 
       twr_records = []
       cumulative_twr = 1.0
@@ -835,13 +889,9 @@ with tab_analytics:
 
       for i, pt in enumerate(trading_points):
         pt_date_str = pt.strftime("%Y-%m-%d")
-
-        # Inflow / Outflow à la date du point
         day_tx = df_transactions[df_transactions["date"] == pt_date_str]
         inflow = 0.0
-        if not day_tx.empty and (
-            not use_hourly or pt.hour == 9
-        ):  # Compté en début de séance
+        if not day_tx.empty and (not is_intraday or pt.hour == 9 and pt.minute <= 10):
           for _, r in day_tx.iterrows():
             if r["type"] == "BUY":
               inflow += (r["quantity"] * r["price"]) + r["fees"]
@@ -900,8 +950,7 @@ with tab_analytics:
 
       st.markdown("#### Performance cumulée (%)")
       st.caption(
-          "Méthode TWR (Time-Weighted Return) neutralisant les apports et"
-          " retraits de trésorerie."
+          "Calcul pondéré dans le temps (TWR) neutralisant les flux de trésorerie."
       )
 
       fig_twr = go.Figure()
@@ -929,13 +978,22 @@ with tab_analytics:
           y=0, line_dash="solid", line_color="rgba(255,255,255,0.15)", line_width=1
       )
 
+      # Ajustement strict de l'échelle horaire si 1J
+      xaxis_config = dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)")
+      if is_intraday and not df_twr.empty:
+        session_date = df_twr["Date"].iloc[-1].strftime("%Y-%m-%d")
+        xaxis_config.update(
+            range=[f"{session_date} 09:00:00", f"{session_date} 17:35:00"],
+            tickformat="%H:%M",
+        )
+
       fig_twr.update_layout(
           hovermode="x unified",
           plot_bgcolor="rgba(0,0,0,0)",
           paper_bgcolor="rgba(0,0,0,0)",
           font=dict(color="#94a3b8"),
           margin=dict(t=10, b=10, l=10, r=10),
-          xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+          xaxis=xaxis_config,
           yaxis=dict(
               showgrid=True,
               gridcolor="rgba(255,255,255,0.05)",
@@ -952,7 +1010,7 @@ with tab_analytics:
     c_g1, c_g2 = st.columns(2, gap="large")
 
     with c_g1:
-      st.markdown("#### Structure du capital (Donut)")
+      st.markdown("#### Structure du capital")
       if not df_positions.empty:
         fig_donut = px.pie(
             df_positions,
