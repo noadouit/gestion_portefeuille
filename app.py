@@ -590,12 +590,11 @@ def get_portfolio_data():
         )
 
     if df_tx.empty:
-        return pd.DataFrame(), pd.DataFrame(), 15.79, 0.0
+        return pd.DataFrame(), pd.DataFrame(), 15.79, 1492.56
 
-    # Socle de départ pour le cash et calcul dynamique des flux
     cash_balance = 15.79
     positions = {}
-    realized_pnl_total = 0.0
+    realized_pnl_total = 1492.56  # Base demandée pour les plus-values réalisées
 
     for _, tx in df_tx.iterrows():
         t_type = tx["type"]
@@ -604,7 +603,7 @@ def get_portfolio_data():
 
         if t_type == "DIVIDEND":
             cash_balance += p
-            realized_pnl_total += p
+            # Les dividendes n'impactent pas les plus-values réalisées
             continue
 
         tk = tx["ticker"]
@@ -635,7 +634,7 @@ def get_portfolio_data():
                 avg_cost = pos["total_cost"] / pos["quantity"]
                 trade_pnl = (p - avg_cost) * q - f
                 pos["realized_pnl"] += trade_pnl
-                realized_pnl_total += trade_pnl
+                realized_pnl_total += trade_pnl  # Seules les ventes impactent les PV réalisées
                 pos["quantity"] -= q
                 pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
                 cash_balance += (q * p) - f
@@ -1003,14 +1002,14 @@ with tab_brief:
         unrealized_total_raw = 2334.66
         unrealized_total = unrealized_total_raw * PRIVACY_RATIO
 
-        total_realized_display = (2229.02 + realized_pnl_calc) * PRIVACY_RATIO
+        total_realized_display = realized_pnl_calc * PRIVACY_RATIO
         cash_display = cash_disponible * PRIVACY_RATIO
 
-        # 5 KPIs sur l'accueil : Actif net (avec delta cash propre), Latentes, Réalisées, Versements, Lignes ouvertes
+        # 5 KPIs sur l'accueil
         k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("Actif net réévalué", f"{current_val:,.2f} €", delta=f"{cash_display:+,.2f} € cash")
         k2.metric("Plus-value latente", f"{unrealized_total:+,.2f} €", delta="+15.06 %")
-        k3.metric("Plus-values réalisées", f"{total_realized_display:+,.2f} €", delta="Gains + Divs")
+        k3.metric("Plus-values réalisées", f"{total_realized_display:+,.2f} €", delta="Gains sur ventes")
         k4.metric("Total des versements", f"{capital_reellement_investi:,.2f} €")
         k5.metric("Lignes ouvertes", f"{len(df_positions):02d}", f"{df_positions['sector'].nunique()} secteurs")
 
@@ -1088,26 +1087,27 @@ with tab_brief:
             recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
             for _, tx in recent_tx.iterrows():
                 if tx["type"] == "DIVIDEND":
-                    continue
-                badge_bg = (
-                    "rgba(16, 185, 129, 0.15)"
-                    if tx["type"] == "BUY"
-                    else "rgba(244, 63, 94, 0.15)"
-                )
-                badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
-                badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
-                qty_display = tx['quantity'] * PRIVACY_RATIO
+                    badge_bg = "rgba(56, 189, 248, 0.15)"
+                    badge_color = "#38bdf8"
+                    badge_lbl = "DIVIDENDE"
+                    qty_display = 0.0
+                else:
+                    badge_bg = "rgba(16, 185, 129, 0.15)" if tx["type"] == "BUY" else "rgba(244, 63, 94, 0.15)"
+                    badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
+                    badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
+                    qty_display = tx['quantity'] * PRIVACY_RATIO
+
                 st.markdown(
                     f"""<div class="glass-card" style="padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="background:{badge_bg}; color:{badge_color}; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:4px;">{badge_lbl}</span>
-                        <span style="font-size:0.88rem; font-weight:600; color:#f1f5f9;">{tx['name']}</span>
+                        <span style="font-size:0.88rem; font-weight:600; color:#f1f5f9;">{tx['name'] or 'Versement Cash'}</span>
                     </div>
-                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Consolidation de ligne'}</div>
+                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Opération'}</div>
                 </div>
                 <div class="mono" style="text-align:right;">
-                    <div style="font-size:0.82rem; font-weight:600; color:#ffffff;">{qty_display:.2f} × {tx['price']:.2f} €</div>
+                    <div style="font-size:0.82rem; font-weight:600; color:#ffffff;">{f"{qty_display:.2f} × {tx['price']:.2f} €" if tx['type'] != 'DIVIDEND' else f"+{tx['price']:.2f} €"}</div>
                     <div style="font-size:0.7rem; color:#64748b;">{tx['date']}</div>
                 </div>
             </div>""",
@@ -1146,27 +1146,28 @@ with tab_holdings:
 
     with col_saisie:
         st.markdown("#### Nouvel ordre ou dividende")
-        search_input = st.text_input(
-            "Rechercher un actif",
-            placeholder="Nom ou ticker...",
-        )
-        search_results = search_yahoo(search_input)
-
-        selected_asset = None
-        if search_results:
-            options = {
-                f"{item['name']} ({item['ticker']})": item for item in search_results
-            }
-            picked_label = st.selectbox(
-                "Valeur sélectionnée", list(options.keys()), index=0
-            )
-            selected_asset = options[picked_label]
-
+        
         with st.form("tx_entry_form", clear_on_submit=True):
             op_type = st.selectbox(
                 "Sens de l'opération", ["Achat", "Vente", "Dividende"]
             )
             op_date = st.date_input("Date d'exécution", value=datetime.today())
+
+            selected_asset = None
+            if op_type != "Dividende":
+                search_input = st.text_input(
+                    "Rechercher un actif",
+                    placeholder="Nom ou ticker...",
+                )
+                search_results = search_yahoo(search_input)
+                if search_results:
+                    options = {
+                        f"{item['name']} ({item['ticker']})": item for item in search_results
+                    }
+                    picked_label = st.selectbox(
+                        "Valeur sélectionnée", list(options.keys()), index=0
+                    )
+                    selected_asset = options[picked_label]
 
             if op_type == "Dividende":
                 div_amount = st.number_input("Montant total du dividende perçu (€)", min_value=0.01, value=50.0, step=1.0)
