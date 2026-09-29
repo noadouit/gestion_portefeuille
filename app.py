@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System & Dégagement menu haut
+# Design System Compact & Anti-Scroll
 st.markdown(
     """
     <style>
@@ -27,10 +27,9 @@ st.markdown(
             color: #94a3b8;
         }
 
-        /* Dégagement massif pour ne jamais couper le menu sous la barre Streamlit */
         .block-container {
-            padding-top: 5.5rem !important;
-            padding-bottom: 3.5rem;
+            padding-top: 4.8rem !important;
+            padding-bottom: 2rem !important;
             max-width: 1440px;
         }
 
@@ -46,27 +45,26 @@ st.markdown(
         .glass-card {
             background: #0d1322;
             border: 1px solid #1a2337;
-            border-radius: 10px;
-            padding: 18px 22px;
+            border-radius: 8px;
+            padding: 14px 16px;
         }
 
         .index-pill {
             background: #0d1322;
             border: 1px solid #1a2337;
             border-radius: 8px;
-            padding: 12px 18px;
+            padding: 10px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        /* Onglets avec visibilité totale */
         div[data-baseweb="tab-list"] {
             gap: 16px !important;
             background-color: transparent !important;
             border-bottom: 1px solid #1a2337 !important;
             padding-bottom: 4px !important;
-            margin-bottom: 2rem !important;
+            margin-bottom: 1.2rem !important;
         }
 
         div[data-baseweb="tab-list"] button,
@@ -76,7 +74,7 @@ st.markdown(
             box-shadow: none !important;
             outline: none !important;
             color: #64748b !important;
-            font-size: 0.95rem !important;
+            font-size: 0.92rem !important;
             font-weight: 500 !important;
             padding: 8px 6px !important;
         }
@@ -95,24 +93,23 @@ st.markdown(
             border-radius: 0 !important;
         }
 
-        /* Table de positions sur-mesure */
+        /* Table de positions custom */
         .custom-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            margin-top: 10px;
         }
         .custom-table th {
             color: #64748b;
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 12px 14px;
+            padding: 10px 12px;
             text-align: left;
             border-bottom: 1px solid #1a2337;
         }
         .custom-table td {
-            padding: 14px 14px;
+            padding: 12px 12px;
             font-size: 0.88rem;
             border-bottom: 1px solid #0f172a;
             color: #f1f5f9;
@@ -142,6 +139,18 @@ st.markdown(
             font-weight: 600;
         }
 
+        .news-container {
+            max-height: 290px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #1a2337 transparent;
+        }
+        .news-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #1a2337;
+        }
+        .news-item:last-child { border-bottom: none; }
+
         div[data-baseweb="input"], div[data-baseweb="select"] {
             border-radius: 6px !important;
             background-color: #0d1322 !important;
@@ -149,7 +158,7 @@ st.markdown(
         }
 
         [data-testid="stMetricValue"] {
-            font-size: 1.85rem !important;
+            font-size: 1.65rem !important;
             font-weight: 700 !important;
             color: #ffffff !important;
         }
@@ -160,12 +169,6 @@ st.markdown(
             border-radius: 6px !important;
             font-weight: 600 !important;
         }
-
-        .news-item {
-            padding: 12px 16px;
-            border-bottom: 1px solid #1a2337;
-        }
-        .news-item:last-child { border-bottom: none; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -274,7 +277,6 @@ def get_market_indices():
 
 @st.cache_data(ttl=900)
 def get_portfolio_news_rss(tickers):
-  """Scraping direct via flux RSS Yahoo Finance (résistant au blocage)."""
   news = []
   headers = {"User-Agent": "Mozilla/5.0"}
   for tk in tickers:
@@ -284,7 +286,7 @@ def get_portfolio_news_rss(tickers):
       if resp.status_code == 200:
         root = ET.fromstring(resp.content)
         items = root.findall("./channel/item")
-        for it in items[:3]:
+        for it in items[:2]:
           title = it.findtext("title", "")
           link = it.findtext("link", "")
           pub_date = it.findtext("pubDate", "")
@@ -440,9 +442,10 @@ tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
 ])
 
 # ====================================================
-# ONGLET 1 : MARCHÉS & SYNTHÈSE
+# ONGLET 1 : MARCHÉS & SYNTHÈSE (COMPACT & ZERO-SCROLL)
 # ====================================================
 with tab_brief:
+  # Bandeau supérieur compact
   indices_data = get_market_indices()
   col_i1, col_i2, col_i3, col_date = st.columns([1, 1, 1, 1.2])
 
@@ -457,28 +460,24 @@ with tab_brief:
       )
       prefix = "+" if vals["change"] > 0 else ""
       st.markdown(
-          f"""
-                <div class="index-pill">
-                    <div>
-                        <div style="font-size:0.75rem; font-weight:600; color:#64748b; letter-spacing:0.04em;">{idx_name}</div>
-                        <div class="mono" style="font-size:1.15rem; font-weight:700; color:#ffffff; margin-top:2px;">{vals['price']:,.2f}</div>
-                    </div>
-                    <div class="mono" style="font-size:0.9rem; font-weight:600; color:{color};">{prefix}{vals['change']:.2f} %</div>
-                </div>
-            """,
+          f"""<div class="index-pill">
+            <div>
+                <div style="font-size:0.72rem; font-weight:600; color:#64748b;">{idx_name}</div>
+                <div class="mono" style="font-size:1.05rem; font-weight:700; color:#ffffff; margin-top:2px;">{vals['price']:,.2f}</div>
+            </div>
+            <div class="mono" style="font-size:0.85rem; font-weight:600; color:{color};">{prefix}{vals['change']:.2f} %</div>
+          </div>""",
           unsafe_allow_html=True,
       )
 
   with col_date:
     st.markdown(
-        f"""
-            <div class="index-pill" style="justify-content:center; text-align:center;">
-                <div>
-                    <div style="font-size:0.75rem; font-weight:600; color:#64748b;">SÉANCE DU JOUR</div>
-                    <div style="font-size:0.95rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{get_french_date()}</div>
-                </div>
-            </div>
-        """,
+        f"""<div class="index-pill" style="justify-content:center; text-align:center;">
+        <div>
+            <div style="font-size:0.72rem; font-weight:600; color:#64748b;">SÉANCE EN COURS</div>
+            <div style="font-size:0.92rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{get_french_date()}</div>
+        </div>
+      </div>""",
         unsafe_allow_html=True,
     )
 
@@ -507,10 +506,12 @@ with tab_brief:
     )
 
     st.write("")
-    c_left, c_right = st.columns([1.2, 1], gap="large")
 
-    with c_left:
-      st.markdown("#### Faits marquants & Mouvements")
+    # Organisation en 3 colonnes pour tout faire tenir à l'écran
+    c_focus, c_arb, c_news = st.columns([1.1, 1.1, 1.2], gap="medium")
+
+    with c_focus:
+      st.markdown("##### Focus Valeurs")
       best_pos = df_positions.sort_values(
           "unrealized_pnl_pct", ascending=False
       ).iloc[0]
@@ -519,33 +520,31 @@ with tab_brief:
       ).iloc[0]
 
       st.markdown(
-          f"""
-                <div class="glass-card" style="margin-bottom:12px; border-left: 3px solid #10b981;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.8rem; font-weight:700; color:#10b981; letter-spacing:0.04em;">MEILLEURE LIGNE</span>
-                        <span class="mono" style="font-size:0.8rem; color:#64748b;">Poids : {best_pos['weight']:.1f} %</span>
-                    </div>
-                    <div style="font-size:1.15rem; font-weight:700; color:#ffffff; margin: 4px 0;">{best_pos['name']} ({best_pos['ticker']})</div>
-                    <div class="mono" style="font-size:0.88rem; color:#cbd5e1;">
-                        Plus-value : <span style="color:#10b981; font-weight:700;">{best_pos['unrealized_pnl_pct']:+.2f} %</span> ({best_pos['unrealized_pnl']:+,.2f} €)
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom:20px; border-left: 3px solid {'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.8rem; font-weight:700; color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; letter-spacing:0.04em;">POINT DE VIGILANCE</span>
-                        <span class="mono" style="font-size:0.8rem; color:#64748b;">PRU : {worst_pos['pru']:.2f} €</span>
-                    </div>
-                    <div style="font-size:1.15rem; font-weight:700; color:#ffffff; margin: 4px 0;">{worst_pos['name']} ({worst_pos['ticker']})</div>
-                    <div class="mono" style="font-size:0.88rem; color:#cbd5e1;">
-                        Performance : <span style="color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; font-weight:700;">{worst_pos['unrealized_pnl_pct']:+.2f} %</span> ({worst_pos['unrealized_pnl']:+,.2f} €)
-                    </div>
-                </div>
-            """,
+          f"""<div class="glass-card" style="margin-bottom:10px; border-left: 3px solid #10b981;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:700; color:#10b981;">SURPERFORMANCE</span>
+                <span class="mono" style="font-size:0.75rem; color:#64748b;">Poids : {best_pos['weight']:.1f} %</span>
+            </div>
+            <div style="font-size:1.05rem; font-weight:700; color:#ffffff; margin: 3px 0;">{best_pos['name']}</div>
+            <div class="mono" style="font-size:0.82rem; color:#cbd5e1;">
+                Plus-value : <span style="color:#10b981; font-weight:700;">{best_pos['unrealized_pnl_pct']:+.2f} %</span> ({best_pos['unrealized_pnl']:+,.2f} €)
+            </div>
+          </div>
+          <div class="glass-card" style="border-left: 3px solid {'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:700; color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">SOUS-PERFORMANCE</span>
+                <span class="mono" style="font-size:0.75rem; color:#64748b;">PRU : {worst_pos['pru']:.2f} €</span>
+            </div>
+            <div style="font-size:1.05rem; font-weight:700; color:#ffffff; margin: 3px 0;">{worst_pos['name']}</div>
+            <div class="mono" style="font-size:0.82rem; color:#cbd5e1;">
+                Performance : <span style="color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; font-weight:700;">{worst_pos['unrealized_pnl_pct']:+.2f} %</span> ({worst_pos['unrealized_pnl']:+,.2f} €)
+            </div>
+          </div>""",
           unsafe_allow_html=True,
       )
 
-      st.markdown("#### Derniers arbitrages")
+    with c_arb:
+      st.markdown("##### Derniers arbitrages")
       recent_tx = df_transactions.sort_values("date", ascending=False).head(3)
       for _, tx in recent_tx.iterrows():
         badge_bg = (
@@ -556,95 +555,48 @@ with tab_brief:
         badge_color = "#10b981" if tx["type"] == "BUY" else "#f43f5e"
         badge_lbl = "ACHAT" if tx["type"] == "BUY" else "VENTE"
         st.markdown(
-            f"""
-                    <div class="glass-card" style="padding:12px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <span style="background:{badge_bg}; color:{badge_color}; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:4px;">{badge_lbl}</span>
-                                <span style="font-size:0.95rem; font-weight:600; color:#f1f5f9;">{tx['name']}</span>
-                                <span class="mono" style="font-size:0.8rem; color:#64748b;">({tx['ticker']})</span>
-                            </div>
-                            <div style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">Thèse : {tx['reason'] or 'Arbitrage de gestion'}</div>
-                        </div>
-                        <div class="mono" style="text-align:right;">
-                            <div style="font-size:0.9rem; font-weight:600; color:#ffffff;">{tx['quantity']} × {tx['price']:.2f} €</div>
-                            <div style="font-size:0.75rem; color:#64748b;">{tx['date']}</div>
-                        </div>
+            f"""<div class="glass-card" style="padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="background:{badge_bg}; color:{badge_color}; font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:4px;">{badge_lbl}</span>
+                        <span style="font-size:0.88rem; font-weight:600; color:#f1f5f9;">{tx['name']}</span>
                     </div>
-                """,
-            unsafe_allow_html=True,
-        )
-
-    with c_right:
-      st.markdown("#### Valorisation (Multiples P/E)")
-      pe_df = (
-          df_positions.dropna(subset=["pe"])[["name", "pe"]]
-          .sort_values("pe")
-          .copy()
-      )
-      if not pe_df.empty:
-        fig_pe = px.bar(
-            pe_df,
-            x="pe",
-            y="name",
-            orientation="h",
-            color="pe",
-            color_continuous_scale=["#3b82f6", "#1d4ed8"],
-        )
-        fig_pe.update_layout(
-            margin=dict(t=10, b=10, l=10, r=10),
-            height=300,
-            xaxis=dict(
-                gridcolor="rgba(255,255,255,0.05)",
-                title="Ratio P/E",
-                tickfont=dict(family="JetBrains Mono"),
-            ),
-            yaxis=dict(
-                gridcolor="rgba(255,255,255,0.05)",
-                title="",
-                tickfont=dict(color="#f8fafc"),
-            ),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            coloraxis_showscale=False,
-        )
-        st.plotly_chart(fig_pe, use_container_width=True)
-      else:
-        st.caption("Données de multiples indisponibles.")
-
-    # ----------------------------------------------------
-    # BANDEAU D'ACTUALITÉS RSS GARANTI
-    # ----------------------------------------------------
-    st.write("")
-    st.markdown("#### Actualités financières des lignes détenues")
-    active_tickers = df_positions["ticker"].tolist()
-    news_items = get_portfolio_news_rss(active_tickers)
-
-    if news_items:
-      st.markdown('<div class="glass-card" style="padding:4px 0;">', unsafe_allow_html=True)
-      for item in news_items:
-        st.markdown(
-            f"""
-                <div class="news-item">
-                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                        <span class="mono" style="font-size:0.75rem; font-weight:700; color:#38bdf8;">{item['ticker']}</span>
-                        <span class="mono" style="font-size:0.75rem; color:#64748b;">{item['pubDate']}</span>
-                    </div>
-                    <div style="margin-top:4px;">
-                        <a href="{item['link']}" target="_blank" rel="noopener noreferrer" style="color:#f1f5f9; text-decoration:none; font-weight:600; font-size:0.92rem;">
-                            {item['title']}
-                        </a>
-                    </div>
+                    <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{tx['reason'] or 'Arbitrage de gestion'}</div>
                 </div>
-            """,
+                <div class="mono" style="text-align:right;">
+                    <div style="font-size:0.82rem; font-weight:600; color:#ffffff;">{tx['quantity']} × {tx['price']:.2f} €</div>
+                    <div style="font-size:0.7rem; color:#64748b;">{tx['date']}</div>
+                </div>
+            </div>""",
             unsafe_allow_html=True,
         )
-      st.markdown('</div>', unsafe_allow_html=True)
-    else:
-      st.caption("Flux d'actualités en synchronisation sur les places financières...")
+
+    with c_news:
+      st.markdown("##### Dépêches financières (Lignes détenues)")
+      active_tickers = df_positions["ticker"].tolist()
+      news_items = get_portfolio_news_rss(active_tickers)
+
+      if news_items:
+        news_html = '<div class="glass-card news-container" style="padding:0;">'
+        for item in news_items:
+          news_html += f"""<div class="news-item">
+            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                <span class="mono" style="font-size:0.72rem; font-weight:700; color:#38bdf8;">{item['ticker']}</span>
+                <span class="mono" style="font-size:0.7rem; color:#64748b;">{item['pubDate']}</span>
+            </div>
+            <div style="margin-top:3px;">
+                <a href="{item['link']}" target="_blank" rel="noopener noreferrer" style="color:#f1f5f9; text-decoration:none; font-weight:600; font-size:0.84rem;">
+                    {item['title']}
+                </a>
+            </div>
+          </div>"""
+        news_html += "</div>"
+        st.markdown(news_html, unsafe_allow_html=True)
+      else:
+        st.caption("Synchronisation du flux financier en cours...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE & ORDRES (TABLEAU VISUEL REFONDU)
+# ONGLET 2 : PORTEFEUILLE & ORDRES (CORRECTION BUG TABLEAU)
 # ====================================================
 with tab_holdings:
   col_saisie, col_table = st.columns([1, 2], gap="large")
@@ -756,57 +708,42 @@ with tab_holdings:
     if df_positions.empty:
       st.write("Aucune position active.")
     else:
-      # Rendu du tableau stylisé sur-mesure
-      rows_html = ""
+      # Génération compacte en évitant toute indentation à 4 espaces
+      rows = []
       for _, pos in df_positions.iterrows():
         pnl_class = "badge-pos" if pos["unrealized_pnl"] >= 0 else "badge-neg"
         prefix = "+" if pos["unrealized_pnl"] >= 0 else ""
-        rows_html += f"""
-                <tr>
-                    <td>
-                        <div style="font-weight:700; color:#ffffff;">{pos['name']}</div>
-                        <span class="mono" style="font-size:0.75rem; color:#64748b;">{pos['ticker']}</span>
-                    </td>
-                    <td><span class="badge-sector">{pos['sector']}</span></td>
-                    <td class="mono">{pos['quantity']:.2f}</td>
-                    <td class="mono" style="color:#94a3b8;">{pos['pru']:.2f} €</td>
-                    <td class="mono" style="font-weight:600; color:#f1f5f9;">{pos['current_price']:.2f} €</td>
-                    <td class="mono" style="font-weight:700; color:#ffffff;">{pos['valuation']:,.2f} €</td>
-                    <td class="{pnl_class}">
-                        {prefix}{pos['unrealized_pnl']:+,.2f} €<br>
-                        <span style="font-size:0.75rem;">({prefix}{pos['unrealized_pnl_pct']:.2f} %)</span>
-                    </td>
-                    <td class="mono" style="color:#64748b;">{pos['weight']:.1f} %</td>
-                </tr>
-                """
+        row = (
+            "<tr>"
+            "<td>"
+            f"<div style='font-weight:700; color:#ffffff;'>{pos['name']}</div>"
+            f"<span class='mono' style='font-size:0.75rem; color:#64748b;'>{pos['ticker']}</span>"
+            "</td>"
+            f"<td><span class='badge-sector'>{pos['sector']}</span></td>"
+            f"<td class='mono'>{pos['quantity']:.2f}</td>"
+            f"<td class='mono' style='color:#94a3b8;'>{pos['pru']:.2f} €</td>"
+            f"<td class='mono' style='font-weight:600; color:#f1f5f9;'>{pos['current_price']:.2f} €</td>"
+            f"<td class='mono' style='font-weight:700; color:#ffffff;'>{pos['valuation']:,.2f} €</td>"
+            f"<td class='{pnl_class}'>{prefix}{pos['unrealized_pnl']:+,.2f} €<br><span style='font-size:0.75rem;'>({prefix}{pos['unrealized_pnl_pct']:.2f} %)</span></td>"
+            f"<td class='mono' style='color:#64748b;'>{pos['weight']:.1f} %</td>"
+            "</tr>"
+        )
+        rows.append(row)
 
-      st.markdown(
-          f"""
-            <div class="glass-card" style="padding:0px; overflow-x:auto;">
-                <table class="custom-table">
-                    <thead>
-                        <tr>
-                            <th>Actif</th>
-                            <th>Secteur</th>
-                            <th>Quantité</th>
-                            <th>PRU</th>
-                            <th>Cours</th>
-                            <th>Valorisation</th>
-                            <th>Plus/Moins-value</th>
-                            <th>Poids</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-            </div>
-            """,
-          unsafe_allow_html=True,
+      table_html = (
+          "<div class='glass-card' style='padding:0px; overflow-x:auto;'>"
+          "<table class='custom-table'>"
+          "<thead><tr>"
+          "<th>Actif</th><th>Secteur</th><th>Quantité</th><th>PRU</th><th>Cours</th><th>Valorisation</th><th>Plus/Moins-value</th><th>Poids</th>"
+          "</tr></thead>"
+          f"<tbody>{''.join(rows)}</tbody>"
+          "</table>"
+          "</div>"
       )
+      st.markdown(table_html, unsafe_allow_html=True)
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE & TWR (ÉCHELLE STRICTE 09h00 - 17h35)
+# ONGLET 3 : PERFORMANCE, TWR & ANALYSE DES RATIOS
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
@@ -827,7 +764,7 @@ with tab_analytics:
     selected_period = st.radio(
         "Période d'analyse",
         timeline_options,
-        index=0,  # 1J par défaut
+        index=0,
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -853,7 +790,6 @@ with tab_analytics:
     if selected_period == "MAX":
       query_start_date = first_tx_date - timedelta(days=5)
     elif is_intraday:
-      # Prise de la dernière journée boursière ouverte
       query_start_date = now_date - timedelta(days=3)
     else:
       calculated_start = now_date - period_deltas[selected_period]
@@ -876,7 +812,6 @@ with tab_analytics:
       if hasattr(raw_prices.index, "tz") and raw_prices.index.tz is not None:
         raw_prices.index = raw_prices.index.tz_convert("Europe/Paris").tz_localize(None)
 
-      # Filtrage spécifique pour 1J : retenir uniquement la dernière date de trading
       if is_intraday and not raw_prices.empty:
         last_trading_day = raw_prices.index[-1].date()
         raw_prices = raw_prices[raw_prices.index.date == last_trading_day]
@@ -978,7 +913,6 @@ with tab_analytics:
           y=0, line_dash="solid", line_color="rgba(255,255,255,0.15)", line_width=1
       )
 
-      # Ajustement strict de l'échelle horaire si 1J
       xaxis_config = dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)")
       if is_intraday and not df_twr.empty:
         session_date = df_twr["Date"].iloc[-1].strftime("%Y-%m-%d")
@@ -1007,7 +941,9 @@ with tab_analytics:
       st.plotly_chart(fig_twr, use_container_width=True)
 
     st.write("")
-    c_g1, c_g2 = st.columns(2, gap="large")
+    
+    # 3 colonnes d'analyse : Donut, Contribution P&L et Multiple P/E
+    c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
 
     with c_g1:
       st.markdown("#### Structure du capital")
@@ -1035,7 +971,7 @@ with tab_analytics:
         st.plotly_chart(fig_donut, use_container_width=True)
 
     with c_g2:
-      st.markdown("#### Plus / Moins-values par ligne (€)")
+      st.markdown("#### Plus / Moins-values (€)")
       if not df_positions.empty:
         sorted_contrib = df_positions.sort_values(
             "unrealized_pnl", ascending=True
@@ -1066,6 +1002,43 @@ with tab_analytics:
             yaxis=dict(showgrid=False, tickfont=dict(color="#f8fafc")),
         )
         st.plotly_chart(fig_contrib, use_container_width=True)
+
+    with c_g3:
+      st.markdown("#### Multiples P/E")
+      pe_df = (
+          df_positions.dropna(subset=["pe"])[["name", "pe"]]
+          .sort_values("pe")
+          .copy()
+      )
+      if not pe_df.empty:
+        fig_pe = px.bar(
+            pe_df,
+            x="pe",
+            y="name",
+            orientation="h",
+            color="pe",
+            color_continuous_scale=["#3b82f6", "#1d4ed8"],
+        )
+        fig_pe.update_layout(
+            margin=dict(t=10, b=10, l=10, r=10),
+            height=280,
+            xaxis=dict(
+                gridcolor="rgba(255,255,255,0.05)",
+                title="Ratio P/E",
+                tickfont=dict(family="JetBrains Mono"),
+            ),
+            yaxis=dict(
+                gridcolor="rgba(255,255,255,0.05)",
+                title="",
+                tickfont=dict(color="#f8fafc"),
+            ),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            coloraxis_showscale=False,
+        )
+        st.plotly_chart(fig_pe, use_container_width=True)
+      else:
+        st.caption("Multiples indisponibles sur les lignes actives.")
 
 # ====================================================
 # ONGLET 4 : JOURNAL DES OPÉRATIONS
