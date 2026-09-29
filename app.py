@@ -10,16 +10,16 @@ import yfinance as yf
 
 # Configuration
 st.set_page_config(
-    page_title="Portfolio Terminal",
+    page_title="Asset Management // Terminal",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# Design System Compact & Anti-Scroll
+# Design System Compact & Titre High-Tech
 st.markdown(
     """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
         html, body, [class*="css"] {
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
@@ -28,8 +28,8 @@ st.markdown(
         }
 
         .block-container {
-            padding-top: 4.8rem !important;
-            padding-bottom: 2rem !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2.5rem !important;
             max-width: 1440px;
         }
 
@@ -40,6 +40,40 @@ st.markdown(
 
         .mono {
             font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Grand Titre High-Tech */
+        .brand-header {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            margin-bottom: 1.6rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .brand-title {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 2.1rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+
+        .brand-badge {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #38bdf8;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .glass-card {
@@ -64,7 +98,7 @@ st.markdown(
             background-color: transparent !important;
             border-bottom: 1px solid #1a2337 !important;
             padding-bottom: 4px !important;
-            margin-bottom: 1.2rem !important;
+            margin-bottom: 1.4rem !important;
         }
 
         div[data-baseweb="tab-list"] button,
@@ -170,6 +204,17 @@ st.markdown(
             font-weight: 600 !important;
         }
     </style>
+""",
+    unsafe_allow_html=True,
+)
+
+# Header High-Tech Global
+st.markdown(
+    """
+    <div class="brand-header">
+        <span class="brand-title">Asset Management</span>
+        <span class="brand-badge">PRO TERMINAL // v2.6</span>
+    </div>
 """,
     unsafe_allow_html=True,
 )
@@ -442,10 +487,9 @@ tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
 ])
 
 # ====================================================
-# ONGLET 1 : MARCHÉS & SYNTHÈSE (COMPACT & ZERO-SCROLL)
+# ONGLET 1 : MARCHÉS & SYNTHÈSE
 # ====================================================
 with tab_brief:
-  # Bandeau supérieur compact
   indices_data = get_market_indices()
   col_i1, col_i2, col_i3, col_date = st.columns([1, 1, 1, 1.2])
 
@@ -507,7 +551,6 @@ with tab_brief:
 
     st.write("")
 
-    # Organisation en 3 colonnes pour tout faire tenir à l'écran
     c_focus, c_arb, c_news = st.columns([1.1, 1.1, 1.2], gap="medium")
 
     with c_focus:
@@ -596,7 +639,7 @@ with tab_brief:
         st.caption("Synchronisation du flux financier en cours...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE & ORDRES (CORRECTION BUG TABLEAU)
+# ONGLET 2 : PORTEFEUILLE & ORDRES
 # ====================================================
 with tab_holdings:
   col_saisie, col_table = st.columns([1, 2], gap="large")
@@ -708,7 +751,6 @@ with tab_holdings:
     if df_positions.empty:
       st.write("Aucune position active.")
     else:
-      # Génération compacte en évitant toute indentation à 4 espaces
       rows = []
       for _, pos in df_positions.iterrows():
         pnl_class = "badge-pos" if pos["unrealized_pnl"] >= 0 else "badge-neg"
@@ -743,7 +785,7 @@ with tab_holdings:
       st.markdown(table_html, unsafe_allow_html=True)
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE, TWR & ANALYSE DES RATIOS
+# ONGLET 3 : PERFORMANCE, TWR & MULTIPLES
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
@@ -942,7 +984,7 @@ with tab_analytics:
 
     st.write("")
     
-    # 3 colonnes d'analyse : Donut, Contribution P&L et Multiple P/E
+    # 3 colonnes d'analyse : Allocation, Contribution P&L et Multiple P/E
     c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
 
     with c_g1:
