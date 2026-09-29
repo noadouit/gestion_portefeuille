@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -9,43 +10,59 @@ import yfinance as yf
 
 # Configuration
 st.set_page_config(
-    page_title="Terminal Financier & Portefeuille",
+    page_title="Portfolio Analytics",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# Style sombre, typographie épurée type terminal Bloomberg / Morning Brief
+# Style épuré type terminal institutionnel
 st.markdown(
     """
     <style>
-        .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1400px; }
-        .market-ticker-box {
+        .block-container { 
+            padding-top: 3.5rem; 
+            padding-bottom: 2rem; 
+            max-width: 1440px;
+        }
+        .stTabs [data-baseweb="tab-list"] { 
+            gap: 12px; 
+            border-bottom: 1px solid #334155; 
+            padding-bottom: 4px;
+            margin-bottom: 1.5rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 10px 20px;
+            border-radius: 6px;
             background-color: #0f172a;
             border: 1px solid #1e293b;
-            border-radius: 8px;
-            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #1e293b !important;
+            color: #38bdf8 !important;
+            border-color: #38bdf8 !important;
+        }
+        .market-ticker-box {
+            background-color: #0b1120;
+            border: 1px solid #1e293b;
+            border-radius: 6px;
+            padding: 12px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .market-ticker-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 600; letter-spacing: 0.05em; }
+        .market-ticker-title { font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 700; }
         .market-ticker-val { font-size: 1.15rem; font-weight: 700; color: #f8fafc; }
         .news-card {
-            background-color: #0f172a;
+            background-color: #0b1120;
             border-left: 3px solid #3b82f6;
             border-radius: 4px;
             padding: 12px 16px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         [data-testid="stMetricValue"] { font-size: 1.6rem; font-weight: 700; }
-        .stTabs [data-baseweb="tab-list"] { gap: 6px; border-bottom: 1px solid #1e293b; }
-        .stTabs [data-baseweb="tab"] {
-            padding: 8px 18px;
-            border-radius: 6px 6px 0 0;
-            background-color: transparent;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
     </style>
 """,
     unsafe_allow_html=True,
@@ -91,8 +108,7 @@ init_db()
 
 @st.cache_data(ttl=900)
 def get_market_indices():
-  """Récupère les cours des indices de référence pour le bandeau supérieur."""
-  indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^TNX": "US 10Y (Yield)"}
+  indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^TNX": "US 10Y"}
   out = {}
   for symbol, name in indices.items():
     try:
@@ -235,9 +251,7 @@ def get_portfolio_data():
 
 df_positions, df_transactions = get_portfolio_data()
 
-# ----------------------------------------------------
-# NAVIGATION PAR ONGLETS
-# ----------------------------------------------------
+# Navigation
 tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
     "Journal & Marchés",
     "Portefeuille & Saisie",
@@ -246,10 +260,9 @@ tab_brief, tab_holdings, tab_analytics, tab_journal = st.tabs([
 ])
 
 # ====================================================
-# ONGLET 1 : JOURNAL & MARCHÉS (ACCUEIL)
+# ONGLET 1 : JOURNAL & MARCHÉS (NON MODIFIÉ)
 # ====================================================
 with tab_brief:
-  # Bandeau Indices Macro
   indices_data = get_market_indices()
   col_i1, col_i2, col_i3, col_date = st.columns([1, 1, 1, 1.2])
 
@@ -291,12 +304,8 @@ with tab_brief:
 
   st.write("")
 
-  # Synthèse Portefeuille
   if df_positions.empty:
-    st.info(
-        "Édition du jour : Portefeuille en attente de premières lignes. Ajoutez"
-        " vos positions dans l'onglet 'Portefeuille & Saisie'."
-    )
+    st.info("Portefeuille en attente d'opérations.")
   else:
     cost_basis = df_positions["total_cost"].sum()
     current_val = df_positions["valuation"].sum()
@@ -320,9 +329,7 @@ with tab_brief:
 
     st.divider()
 
-    # Colonnes style Morning Paper : Faits marquants et Movers
     c_left, c_right = st.columns([1.2, 1])
-
     with c_left:
       st.markdown("### Focus Valeurs : Derniers Mouvements")
       best_pos = df_positions.sort_values(
@@ -337,13 +344,13 @@ with tab_brief:
                 <div class="news-card" style="border-left-color: #10b981;">
                     <strong style="color: #10b981;">Surperformance :</strong> {best_pos['name']} ({best_pos['ticker']})
                     <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #cbd5e1;">
-                        Plus-value latente de <b>{best_pos['unrealized_pnl_pct']:+.2f}%</b> ({best_pos['unrealized_pnl']:+,.2f} €). Poids dans le portefeuille : {best_pos['weight']:.1f}%.
+                        Plus-value latente de <b>{best_pos['unrealized_pnl_pct']:+.2f}%</b> ({best_pos['unrealized_pnl']:+,.2f} €). Poids : {best_pos['weight']:.1f}%.
                     </p>
                 </div>
                 <div class="news-card" style="border-left-color: {'#ef4444' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">
                     <strong style="color: {'#ef4444' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">Point d'attention :</strong> {worst_pos['name']} ({worst_pos['ticker']})
                     <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #cbd5e1;">
-                        Performance actuelle de <b>{worst_pos['unrealized_pnl_pct']:+.2f}%</b> ({worst_pos['unrealized_pnl']:+,.2f} €). PRU : {worst_pos['pru']:.2f} € vs Dernier cours : {worst_pos['current_price']:.2f} €.
+                        Performance de <b>{worst_pos['unrealized_pnl_pct']:+.2f}%</b> ({worst_pos['unrealized_pnl']:+,.2f} €). PRU : {worst_pos['pru']:.2f} € vs Cours : {worst_pos['current_price']:.2f} €.
                     </p>
                 </div>
             """,
@@ -365,7 +372,7 @@ with tab_brief:
         )
 
     with c_right:
-      st.markdown("### Valorisations Relatives (P/E Ratio)")
+      st.markdown("### Multiples de Résultats (P/E)")
       pe_df = (
           df_positions.dropna(subset=["pe"])[["name", "pe"]]
           .sort_values("pe")
@@ -377,31 +384,28 @@ with tab_brief:
             x="pe",
             y="name",
             orientation="h",
-            labels={"pe": "Multiple de résultat (P/E)", "name": ""},
-            color_discrete_sequence=["#3b82f6"],
+            color_discrete_sequence=["#38bdf8"],
         )
         fig_pe.update_layout(
             margin=dict(t=10, b=10, l=10, r=10),
             height=280,
-            xaxis=dict(gridcolor="#1e293b"),
-            yaxis=dict(gridcolor="#1e293b"),
+            xaxis=dict(gridcolor="#1e293b", title="Multiple P/E"),
+            yaxis=dict(gridcolor="#1e293b", title=""),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
         )
         st.plotly_chart(fig_pe, use_container_width=True)
-      else:
-        st.caption("Données de multiples indisponibles sur les lignes actives.")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE & SAISIE D'ORDRES
+# ONGLET 2 : PORTEFEUILLE & SAISIE
 # ====================================================
 with tab_holdings:
   col_saisie, col_table = st.columns([1, 2], gap="large")
 
   with col_saisie:
     st.subheader("Enregistrer un ordre")
-
     search_input = st.text_input(
-        "Recherche de titre (Yahoo Finance)",
-        placeholder="Tapez le nom ou ticker (ex: Eiffage, ALO.PA)...",
+        "Recherche de titre", placeholder="Tapez le nom ou ticker..."
     )
     search_results = search_yahoo(search_input)
 
@@ -432,16 +436,9 @@ with tab_holdings:
       fees = c_f.number_input("Frais (€)", min_value=0.0, value=0.0)
       fx_rate = c_fx.number_input("Taux de change", min_value=0.0001, value=1.0)
 
-      reason = st.text_input(
-          "Motif d'arbitrage",
-          placeholder="Ex: Décote sur NAV, repli technique...",
-      )
+      reason = st.text_input("Motif d'arbitrage", placeholder="Ex: Décote NAV...")
       notes = st.text_area(
-          "Thèse d'investissement & Ratios",
-          placeholder=(
-              "Ex: PER d'entrée 8.5x, FCF yield estimé > 7%, catalyseur plan de"
-              " cession..."
-          ),
+          "Thèse & Ratios", placeholder="PER d'entrée, prévisions de cash flow..."
       )
 
       submit = st.form_submit_button(
@@ -450,7 +447,7 @@ with tab_holdings:
 
       if submit:
         if not selected_asset:
-          st.error("Veuillez rechercher et sélectionner une action valide.")
+          st.error("Sélectionnez une action valide.")
         else:
           type_code = "BUY" if "Achat" in op_type else (
               "SELL" if "Vente" in op_type else "DIVIDEND"
@@ -500,7 +497,7 @@ with tab_holdings:
   with col_table:
     st.subheader("Positions Actives")
     if df_positions.empty:
-      st.write("Aucune ligne en portefeuille actuellement.")
+      st.write("Aucune position ouverte.")
     else:
       view_df = df_positions[[
           "ticker",
@@ -543,151 +540,198 @@ with tab_holdings:
       )
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE & ALLOCATION
+# ONGLET 3 : PERFORMANCE (MÉTHODE TWR & GRAPHIQUES ÉPURÉS)
 # ====================================================
 with tab_analytics:
   if df_transactions.empty:
-    st.info("Aucune donnée disponible pour le calcul de performance.")
+    st.info("Aucune transaction enregistrée.")
   else:
-    # 1. Courbe interactive d'évolution du portefeuille
-    st.subheader("Évolution Temporelle du Portefeuille")
+    min_date = pd.to_datetime(df_transactions["date"].min())
+    tickers_list = df_transactions["ticker"].unique().tolist()
 
-    min_date = pd.to_datetime(df_transactions["date"].min()) - timedelta(
-        days=2
-    )
-    all_tickers = df_transactions["ticker"].unique().tolist()
+    with st.spinner("Calcul des rendements TWR et des cours..."):
+      # Téléchargement des cours des actifs + benchmark CAC 40
+      tickers_with_bench = tickers_list + ["^FCHI"]
+      raw_prices = yf.download(
+          tickers_with_bench,
+          start=min_date - timedelta(days=5),
+          progress=False,
+      )["Close"]
+      if isinstance(raw_prices, pd.Series):
+        raw_prices = raw_prices.to_frame(name=tickers_with_bench[0])
+      raw_prices = raw_prices.ffill().bfill()
 
-    with st.spinner("Reconstitution historique des cours..."):
-      hist_data = yf.download(all_tickers, start=min_date, progress=False)[
-          "Close"
-      ]
-      if isinstance(hist_data, pd.Series):
-        hist_data = hist_data.to_frame(name=all_tickers[0])
-      hist_data = hist_data.ffill().bfill()
+      # Filtrer les jours ouvrés à partir de la première transaction
+      trading_days = [d for d in raw_prices.index if d >= min_date]
 
-      timeline = []
-      for dt in hist_data.index:
-        sub_tx = df_transactions[pd.to_datetime(df_transactions["date"]) <= dt]
-        invested = 0.0
-        portfolio_val = 0.0
+      # Reconstitution TWR quotidienne
+      # TWR(t) = Produit des (V_fin / (V_deb + Flux_net))
+      twr_records = []
+      cumulative_twr = 1.0
+      prev_portfolio_val = 0.0
 
-        for tk in all_tickers:
-          tk_tx = sub_tx[sub_tx["ticker"] == tk]
-          q_buy = tk_tx[tk_tx["type"] == "BUY"]["quantity"].sum()
-          q_sell = tk_tx[tk_tx["type"] == "SELL"]["quantity"].sum()
-          net_q = max(0.0, q_buy - q_sell)
+      for i, d in enumerate(trading_days):
+        day_str = d.strftime("%Y-%m-%d")
 
-          c_buy = (
-              tk_tx[tk_tx["type"] == "BUY"]["quantity"]
-              * tk_tx[tk_tx["type"] == "BUY"]["price"]
-          ).sum()
-          c_sell = (
-              tk_tx[tk_tx["type"] == "SELL"]["quantity"]
-              * tk_tx[tk_tx["type"] == "SELL"]["price"]
-          ).sum()
-          invested += max(0.0, c_buy - c_sell)
+        # Flux net du jour (achats = apport de cash, ventes = retrait de cash)
+        day_tx = df_transactions[df_transactions["date"] == day_str]
+        inflow = 0.0
+        if not day_tx.empty:
+          for _, r in day_tx.iterrows():
+            if r["type"] == "BUY":
+              inflow += (r["quantity"] * r["price"]) + r["fees"]
+            elif r["type"] == "SELL":
+              inflow -= (r["quantity"] * r["price"]) - r["fees"]
 
-          if net_q > 0 and tk in hist_data.columns:
-            px_val = hist_data.loc[dt, tk]
-            if pd.notnull(px_val):
-              portfolio_val += net_q * float(px_val)
+        # Valorisation du portefeuille en fin de journée
+        sub_tx = df_transactions[pd.to_datetime(df_transactions["date"]) <= d]
+        end_val = 0.0
+        for tk in tickers_list:
+          tx_tk = sub_tx[sub_tx["ticker"] == tk]
+          q = tx_tk[tx_tk["type"] == "BUY"]["quantity"].sum() - tx_tk[
+              tx_tk["type"] == "SELL"
+          ]["quantity"].sum()
+          if q > 0 and tk in raw_prices.columns:
+            px = raw_prices.loc[d, tk]
+            if pd.notnull(px):
+              end_val += q * float(px)
 
-        timeline.append({
-            "Date": dt,
-            "Valorisation (€)": portfolio_val,
-            "Capital Engagé (€)": invested,
+        # Calcul du sous-rendement de la période
+        if i == 0:
+          start_capital = inflow if inflow > 0 else end_val
+          sub_return = (
+              (end_val / start_capital) - 1.0 if start_capital > 0 else 0.0
+          )
+        else:
+          base = prev_portfolio_val + inflow
+          sub_return = (end_val - base) / base if base > 0 else 0.0
+
+        cumulative_twr *= 1.0 + sub_return
+        prev_portfolio_val = end_val
+
+        # Benchmark CAC 40 base 100
+        bench_close = (
+            raw_prices.loc[d, "^FCHI"] if "^FCHI" in raw_prices.columns else 1.0
+        )
+
+        twr_records.append({
+            "Date": d,
+            "TWR_Index": cumulative_twr * 100.0,
+            "TWR_Return_Pct": (cumulative_twr - 1.0) * 100.0,
+            "Portfolio_Value": end_val,
+            "Benchmark_Close": bench_close,
         })
 
-      df_evo = pd.DataFrame(timeline)
+      df_twr = pd.DataFrame(twr_records)
 
-      fig_evo = go.Figure()
-      fig_evo.add_trace(
+      # Normaliser le benchmark en base 100
+      if not df_twr.empty and df_twr["Benchmark_Close"].iloc[0] > 0:
+        base_bench = df_twr["Benchmark_Close"].iloc[0]
+        df_twr["Benchmark_Index"] = (
+            df_twr["Benchmark_Close"] / base_bench
+        ) * 100.0
+        df_twr["Benchmark_Return_Pct"] = df_twr["Benchmark_Index"] - 100.0
+
+      # 1. Courbe TWR Institutionnelle
+      st.subheader("Performance Pondérée dans le Temps (TWR) — Base 100")
+      st.caption(
+          "La méthode TWR élimine les distorsions causées par les apports ou"
+          " retraits de trésorerie."
+      )
+
+      fig_twr = go.Figure()
+      fig_twr.add_trace(
           go.Scatter(
-              x=df_evo["Date"],
-              y=df_evo["Valorisation (€)"],
-              name="Valorisation",
-              line=dict(color="#3b82f6", width=2.5),
-              fill="tozeroy",
-              fillcolor="rgba(59, 130, 246, 0.08)",
+              x=df_twr["Date"],
+              y=df_twr["TWR_Index"],
+              mode="lines",
+              name="Portefeuille (TWR)",
+              line=dict(color="#38bdf8", width=2.2),
           )
       )
-      fig_evo.add_trace(
-          go.Scatter(
-              x=df_evo["Date"],
-              y=df_evo["Capital Engagé (€)"],
-              name="Capital Engagé",
-              line=dict(color="#64748b", width=1.8, dash="dot"),
-          )
-      )
-      fig_evo.update_layout(
+      if "^FCHI" in raw_prices.columns:
+        fig_twr.add_trace(
+            go.Scatter(
+                x=df_twr["Date"],
+                y=df_twr["Benchmark_Index"],
+                mode="lines",
+                name="CAC 40 (Dividendes non réinvestis)",
+                line=dict(color="#64748b", width=1.5, dash="dash"),
+            )
+        )
+
+      fig_twr.update_layout(
           hovermode="x unified",
+          plot_bgcolor="#0b1120",
+          paper_bgcolor="#0b1120",
+          font=dict(color="#94a3b8"),
           margin=dict(t=20, b=20, l=10, r=10),
-          xaxis=dict(gridcolor="#1e293b"),
-          yaxis=dict(gridcolor="#1e293b", title="Euros (€)"),
-          legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+          xaxis=dict(showgrid=True, gridcolor="#1e293b"),
+          yaxis=dict(
+              showgrid=True,
+              gridcolor="#1e293b",
+              title="Indice de performance (Base 100)",
+          ),
+          legend=dict(
+              orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+          ),
       )
-      st.plotly_chart(fig_evo, use_container_width=True)
+      st.plotly_chart(fig_twr, use_container_width=True)
 
     st.divider()
 
-    # 2. Répartition et P&L
-    c_pie1, c_pie2 = st.columns(2)
+    # 2. Graphiques sobres : Treemap & Contribution
+    c_g1, c_g2 = st.columns(2, gap="large")
 
-    with c_pie1:
-      st.subheader("Allocation par Actif")
+    with c_g1:
+      st.subheader("Matrice d'Allocation (Secteur & Ligne)")
       if not df_positions.empty:
-        fig_donut_act = px.pie(
+        fig_tree = px.treemap(
             df_positions,
+            path=["sector", "name"],
             values="valuation",
-            names="name",
-            hole=0.55,
-            color_discrete_sequence=px.colors.sequential.Teal,
+            color="unrealized_pnl_pct",
+            color_continuous_scale=["#ef4444", "#1e293b", "#10b981"],
+            color_continuous_midpoint=0,
         )
-        fig_donut_act.update_layout(
-            margin=dict(t=30, b=10, l=10, r=10), showlegend=True
+        fig_tree.update_layout(
+            margin=dict(t=20, b=10, l=10, r=10),
+            paper_bgcolor="#0b1120",
+            font=dict(color="#f8fafc"),
         )
-        st.plotly_chart(fig_donut_act, use_container_width=True)
+        st.plotly_chart(fig_tree, use_container_width=True)
 
-    with c_pie2:
-      st.subheader("Allocation Sectorielle")
+    with c_g2:
+      st.subheader("Contribution Nette au Portefeuille (€)")
       if not df_positions.empty:
-        fig_donut_sec = px.pie(
-            df_positions,
-            values="valuation",
-            names="sector",
-            hole=0.55,
-            color_discrete_sequence=px.colors.sequential.Blues_r,
+        sorted_contrib = df_positions.sort_values(
+            "unrealized_pnl", ascending=True
         )
-        fig_donut_sec.update_layout(
-            margin=dict(t=30, b=10, l=10, r=10), showlegend=True
-        )
-        st.plotly_chart(fig_donut_sec, use_container_width=True)
+        colors = [
+            "#10b981" if v >= 0 else "#ef4444"
+            for v in sorted_contrib["unrealized_pnl"]
+        ]
 
-    if not df_positions.empty:
-      st.subheader("Contribution à la Performance Latente (%)")
-      sorted_pnl = df_positions.sort_values(
-          "unrealized_pnl_pct", ascending=True
-      )
-      fig_bars = px.bar(
-          sorted_pnl,
-          x="unrealized_pnl_pct",
-          y="name",
-          orientation="h",
-          color="unrealized_pnl_pct",
-          color_continuous_scale=["#ef4444", "#334155", "#10b981"],
-          color_continuous_midpoint=0,
-          labels={"unrealized_pnl_pct": "+/- Value Latente (%)", "name": ""},
-      )
-      fig_bars.update_layout(
-          margin=dict(t=10, b=10, l=10, r=10),
-          xaxis=dict(gridcolor="#1e293b"),
-          yaxis=dict(gridcolor="#1e293b"),
-          coloraxis_showscale=False,
-      )
-      st.plotly_chart(fig_bars, use_container_width=True)
+        fig_contrib = go.Figure(
+            go.Bar(
+                x=sorted_contrib["unrealized_pnl"],
+                y=sorted_contrib["name"],
+                orientation="h",
+                marker_color=colors,
+            )
+        )
+        fig_contrib.update_layout(
+            plot_bgcolor="#0b1120",
+            paper_bgcolor="#0b1120",
+            font=dict(color="#94a3b8"),
+            margin=dict(t=20, b=10, l=10, r=10),
+            xaxis=dict(showgrid=True, gridcolor="#1e293b", title="Gain / Perte en €"),
+            yaxis=dict(showgrid=False),
+        )
+        st.plotly_chart(fig_contrib, use_container_width=True)
 
 # ====================================================
-# ONGLET 4 : HISTORIQUE DES OPÉRATIONS
+# ONGLET 4 : HISTORIQUE DES OPÉRATIONS (NON MODIFIÉ)
 # ====================================================
 with tab_journal:
   st.subheader("Journal Central des Transactions")
