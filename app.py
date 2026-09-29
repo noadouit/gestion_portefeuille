@@ -28,7 +28,6 @@ st.markdown(
             color: #94a3b8;
         }
 
-        /* Dégagement augmenté pour abaisser tout le contenu */
         .block-container {
             padding-top: 4.2rem !important;
             padding-bottom: 2.5rem !important;
@@ -44,7 +43,6 @@ st.markdown(
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Grand Titre Épuré sans badge */
         .brand-header {
             margin-bottom: 2rem;
             padding-bottom: 0.8rem;
@@ -113,7 +111,6 @@ st.markdown(
             border-radius: 0 !important;
         }
 
-        /* Table de positions custom aérée */
         .custom-table {
             width: 100%;
             border-collapse: separate;
@@ -194,7 +191,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header épuré
+# Header
 st.markdown(
     """
     <div class="brand-header">
@@ -307,7 +304,6 @@ def get_market_indices():
 
 @st.cache_data(ttl=900)
 def get_portfolio_news_rss(tickers):
-  """Scraping RSS avec parsing RFC 2822 et tri chronologique strict."""
   news = []
   headers = {"User-Agent": "Mozilla/5.0"}
   for tk in tickers:
@@ -322,7 +318,6 @@ def get_portfolio_news_rss(tickers):
           link = it.findtext("link", "")
           pub_date_raw = it.findtext("pubDate", "")
 
-          # Parsing chronologique précis
           parsed_timestamp = 0
           display_date = ""
           if pub_date_raw:
@@ -344,7 +339,6 @@ def get_portfolio_news_rss(tickers):
     except Exception:
       continue
 
-  # Tri chronologique décroissant (les actualités les plus récentes en tête)
   news.sort(key=lambda x: x["timestamp"], reverse=True)
   return news[:10]
 
@@ -403,7 +397,7 @@ def get_portfolio_data():
   with get_connection() as conn:
     df_tx = pd.read_sql_query(
         """
-            SELECT t.id, t.type, t.date, t.quantity, t.price, t.fees, t.exchange_rate, 
+            SELECT t.id, t.asset_id, t.type, t.date, t.quantity, t.price, t.fees, t.exchange_rate, 
                    t.reason, t.notes, a.ticker, a.name, a.sector
             FROM transactions t
             JOIN assets a ON t.asset_id = a.id
@@ -420,6 +414,7 @@ def get_portfolio_data():
     tk = tx["ticker"]
     if tk not in positions:
       positions[tk] = {
+          "asset_id": tx["asset_id"],
           "ticker": tk,
           "name": tx["name"],
           "sector": tx["sector"] if tx["sector"] else "Divers",
@@ -641,10 +636,9 @@ with tab_brief:
         st.caption("Synchronisation du flux financier en cours...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE & ORDRES (TABLEAU ÉLARGI)
+# ONGLET 2 : PORTEFEUILLE, ORDRES & GESTION (MODIFICATION / SUPPRESSION)
 # ====================================================
 with tab_holdings:
-  # Élargissement du ratio de colonnes de [1, 2] à [1, 2.8]
   col_saisie, col_table = st.columns([1, 2.8], gap="large")
 
   with col_saisie:
@@ -786,6 +780,151 @@ with tab_holdings:
           "</div>"
       )
       st.markdown(table_html, unsafe_allow_html=True)
+
+  # ====================================================
+  # SECTION GESTION : MODIFIER OU SUPPRIMER UNE POSITION / TRANSACTION
+  # ====================================================
+  st.write("")
+  st.divider()
+  st.markdown("#### Gestion des positions & opérations")
+
+  col_del_asset, col_edit_tx = st.columns([1, 1.8], gap="large")
+
+  with col_del_asset:
+    st.markdown("##### Clôturer / Supprimer une ligne")
+    if not df_positions.empty:
+      asset_dict = {
+          f"{row['name']} ({row['ticker']})": row["ticker"]
+          for _, row in df_positions.iterrows()
+      }
+      asset_selected_label = st.selectbox(
+          "Sélectionner la valeur à retirer entièrement :",
+          list(asset_dict.keys()),
+          key="del_asset_select",
+      )
+      ticker_to_delete = asset_dict[asset_selected_label]
+
+      st.caption(
+          "Cette action supprimera toutes les transactions associées à cette valeur dans la base."
+      )
+
+      if st.button(
+          f"Supprimer la ligne {ticker_to_delete}",
+          key="btn_del_asset",
+          type="primary",
+      ):
+        with get_connection() as conn:
+          cur = conn.cursor()
+          cur.execute(
+              "SELECT id FROM assets WHERE ticker = ?", (ticker_to_delete,)
+          )
+          row_a = cur.fetchone()
+          if row_a:
+            aid = row_a[0]
+            cur.execute(
+                "DELETE FROM transactions WHERE asset_id = ?", (aid,)
+            )
+            cur.execute("DELETE FROM assets WHERE id = ?", (aid,))
+            cur.execute(
+                "DELETE FROM price_history WHERE ticker = ?",
+                (ticker_to_delete,),
+            )
+            conn.commit()
+        st.success(f"La valeur {ticker_to_delete} a été retirée du portefeuille.")
+        st.rerun()
+    else:
+      st.caption("Aucune ligne active à supprimer.")
+
+  with col_edit_tx:
+    st.markdown("##### Modifier ou supprimer une transaction précise")
+    if not df_transactions.empty:
+      # Menu de sélection d'une transaction
+      tx_options = {}
+      for _, t in df_transactions.iterrows():
+        lbl = (
+            f"ID #{t['id']} — {t['date']} | {t['type']} {t['ticker']} ("
+            f"{t['quantity']} titres @ {t['price']:.2f} €)"
+        )
+        tx_options[lbl] = t["id"]
+
+      selected_tx_lbl = st.selectbox(
+          "Sélectionner l'opération à éditer :",
+          list(tx_options.keys()),
+          key="edit_tx_select",
+      )
+      tx_id = tx_options[selected_tx_lbl]
+      tx_data = df_transactions[df_transactions["id"] == tx_id].iloc[0]
+
+      with st.form("form_edit_single_tx"):
+        c1, c2, c3 = st.columns(3)
+        edit_type = c1.selectbox(
+            "Sens",
+            ["BUY", "SELL", "DIVIDEND"],
+            index=["BUY", "SELL", "DIVIDEND"].index(tx_data["type"]),
+        )
+        edit_date = c2.date_input(
+            "Date", value=datetime.strptime(tx_data["date"], "%Y-%m-%d")
+        )
+        edit_qty = c3.number_input(
+            "Quantité", min_value=0.0001, value=float(tx_data["quantity"])
+        )
+
+        c4, c5 = st.columns(2)
+        edit_px = c4.number_input(
+            "Prix unitaire (€)", min_value=0.0001, value=float(tx_data["price"])
+        )
+        edit_fees = c5.number_input(
+            "Frais (€)", min_value=0.0, value=float(tx_data["fees"])
+        )
+
+        edit_reason = st.text_input(
+            "Motif", value=str(tx_data["reason"] or "")
+        )
+        edit_notes = st.text_area(
+            "Thèse / Ratios", value=str(tx_data["notes"] or "")
+        )
+
+        btn_c1, btn_c2 = st.columns(2)
+        save_changes = btn_c1.form_submit_button(
+            "Enregistrer les modifications", use_container_width=True
+        )
+        delete_tx = btn_c2.form_submit_button(
+            "Supprimer cette transaction", use_container_width=True
+        )
+
+        if save_changes:
+          with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                            UPDATE transactions 
+                            SET type = ?, date = ?, quantity = ?, price = ?, fees = ?, reason = ?, notes = ?
+                            WHERE id = ?
+                        """,
+                (
+                    edit_type,
+                    edit_date.strftime("%Y-%m-%d"),
+                    edit_qty,
+                    edit_px,
+                    edit_fees,
+                    edit_reason,
+                    edit_notes,
+                    tx_id,
+                ),
+            )
+            conn.commit()
+          st.success("Transaction mise à jour avec succès.")
+          st.rerun()
+
+        if delete_tx:
+          with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM transactions WHERE id = ?", (tx_id,))
+            conn.commit()
+          st.warning("Transaction supprimée.")
+          st.rerun()
+    else:
+      st.caption("Aucune transaction enregistrée.")
 
 # ====================================================
 # ONGLET 3 : PERFORMANCE, TWR & MULTIPLES
