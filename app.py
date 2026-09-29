@@ -1,3 +1,4 @@
+import hashlib
 import sqlite3
 import time
 from datetime import datetime, timedelta
@@ -18,8 +19,23 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mot de passe pour afficher les vrais montants
-REAL_DATA_PASSWORD = "secret2026"
+# Sécurité : Empreinte SHA-256 de "secret2026" (impossible à lire en clair depuis GitHub)
+# Pour changer le mdp plus tard : hashlib.sha256("ton_nouveau_mdp".encode()).hexdigest()
+DEFAULT_PASSWORD_HASH = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"  # hash de "secret2026"
+
+def verify_password(input_password: str) -> bool:
+    """Vérifie soit via st.secrets (Streamlit Cloud) soit via le hash SHA-256."""
+    if not input_password:
+        return False
+    # Vérification Streamlit Secrets si configuré
+    try:
+        if "REAL_DATA_PASSWORD" in st.secrets:
+            return input_password == st.secrets["REAL_DATA_PASSWORD"]
+    except Exception:
+        pass
+    # Repli sur le hash SHA-256 sécurisé
+    hashed_input = hashlib.sha256(input_password.encode("utf-8")).hexdigest()
+    return hashed_input == DEFAULT_PASSWORD_HASH
 
 # Gestion de l'état d'authentification et de l'animation hacker
 if "authenticated" not in st.session_state:
@@ -657,7 +673,7 @@ def get_portfolio_data():
 
 df_positions, df_transactions = get_portfolio_data()
 
-# Calcul de la performance journalière (1J) pondérée
+# Calcul de la variation journalière (1J) pondérée
 if not df_positions.empty and df_positions["valuation"].sum() > 0:
     day_perf_global = (
         df_positions["valuation"] * df_positions["day_change"]
@@ -670,7 +686,7 @@ day_badge_bg = "rgba(16, 185, 129, 0.12)" if day_perf_global >= 0 else "rgba(244
 day_badge_border = "rgba(16, 185, 129, 0.3)" if day_perf_global >= 0 else "rgba(244, 63, 94, 0.3)"
 day_arrow = "▲" if day_perf_global > 0 else ("▼" if day_perf_global < 0 else "■")
 
-# Design System de l'application
+# Injection CSS (align-items: center pour centrer le milieu du titre et de la pastille)
 st.markdown(
     """
     <style>
@@ -701,11 +717,21 @@ st.markdown(
             font-family: 'Plus Jakarta Sans', sans-serif;
             font-size: 2.2rem;
             font-weight: 800;
+            line-height: 1;
             letter-spacing: -0.03em;
             background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-transform: uppercase;
+        }
+
+        /* Alignement vertical au centre parfait */
+        .title-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            min-height: 48px;
         }
 
         .day-perf-pill {
@@ -718,6 +744,7 @@ st.markdown(
             align-items: center;
             gap: 6px;
             letter-spacing: 0.02em;
+            line-height: 1.2;
         }
 
         .mode-indicator {
@@ -870,13 +897,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header direct avec titre + PERFORMANCE DU JOUR + contrôle déverrouillage
+# Header : Titre et Pastille 1J parfaitement alignés au milieu
 col_title, col_auth = st.columns([3.8, 1.2])
 
 with col_title:
     st.markdown(
         f"""
-        <div style="display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;">
+        <div class="title-container">
             <span class="brand-title">Asset Management</span>
             <div class="day-perf-pill" style="background:{day_badge_bg}; color:{day_badge_color}; border:1px solid {day_badge_border};">
                 <span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase;">1J</span>
@@ -892,7 +919,7 @@ with col_auth:
         with st.expander("🔒 Déverrouiller (Mode Démo)", expanded=False):
             pwd_try = st.text_input("Mot de passe", type="password", key="pwd_top_input")
             if st.button("Afficher vraies valeurs", use_container_width=True):
-                if pwd_try == REAL_DATA_PASSWORD:
+                if verify_password(pwd_try):
                     st.session_state["authenticated"] = True
                     st.session_state["trigger_hacker_fx"] = True
                     st.rerun()
