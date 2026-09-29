@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
+import email.utils
 import xml.etree.ElementTree as ET
 import pandas as pd
 import plotly.express as px
@@ -10,12 +11,12 @@ import yfinance as yf
 
 # Configuration
 st.set_page_config(
-    page_title="Asset Management // Terminal",
+    page_title="Asset Management",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# Design System Compact & Titre High-Tech
+# Design System
 st.markdown(
     """
     <style>
@@ -27,10 +28,11 @@ st.markdown(
             color: #94a3b8;
         }
 
+        /* Dégagement augmenté pour abaisser tout le contenu */
         .block-container {
-            padding-top: 2rem !important;
+            padding-top: 4.2rem !important;
             padding-bottom: 2.5rem !important;
-            max-width: 1440px;
+            max-width: 1480px;
         }
 
         header[data-testid="stHeader"] {
@@ -42,37 +44,21 @@ st.markdown(
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Grand Titre High-Tech */
+        /* Grand Titre Épuré sans badge */
         .brand-header {
-            display: flex;
-            align-items: baseline;
-            gap: 14px;
-            margin-bottom: 1.6rem;
+            margin-bottom: 2rem;
             padding-bottom: 0.8rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .brand-title {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 2.1rem;
+            font-size: 2.2rem;
             font-weight: 800;
             letter-spacing: -0.03em;
             background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-transform: uppercase;
-        }
-
-        .brand-badge {
-            background: rgba(56, 189, 248, 0.1);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            color: #38bdf8;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 4px;
-            letter-spacing: 0.08em;
             text-transform: uppercase;
         }
 
@@ -98,7 +84,7 @@ st.markdown(
             background-color: transparent !important;
             border-bottom: 1px solid #1a2337 !important;
             padding-bottom: 4px !important;
-            margin-bottom: 1.4rem !important;
+            margin-bottom: 1.6rem !important;
         }
 
         div[data-baseweb="tab-list"] button,
@@ -127,7 +113,7 @@ st.markdown(
             border-radius: 0 !important;
         }
 
-        /* Table de positions custom */
+        /* Table de positions custom aérée */
         .custom-table {
             width: 100%;
             border-collapse: separate;
@@ -138,12 +124,12 @@ st.markdown(
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 10px 12px;
+            padding: 12px 16px;
             text-align: left;
             border-bottom: 1px solid #1a2337;
         }
         .custom-table td {
-            padding: 12px 12px;
+            padding: 14px 16px;
             font-size: 0.88rem;
             border-bottom: 1px solid #0f172a;
             color: #f1f5f9;
@@ -208,12 +194,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header High-Tech Global
+# Header épuré
 st.markdown(
     """
     <div class="brand-header">
         <span class="brand-title">Asset Management</span>
-        <span class="brand-badge">PRO TERMINAL // v2.6</span>
     </div>
 """,
     unsafe_allow_html=True,
@@ -322,6 +307,7 @@ def get_market_indices():
 
 @st.cache_data(ttl=900)
 def get_portfolio_news_rss(tickers):
+  """Scraping RSS avec parsing RFC 2822 et tri chronologique strict."""
   news = []
   headers = {"User-Agent": "Mozilla/5.0"}
   for tk in tickers:
@@ -331,20 +317,36 @@ def get_portfolio_news_rss(tickers):
       if resp.status_code == 200:
         root = ET.fromstring(resp.content)
         items = root.findall("./channel/item")
-        for it in items[:2]:
+        for it in items[:3]:
           title = it.findtext("title", "")
           link = it.findtext("link", "")
-          pub_date = it.findtext("pubDate", "")
+          pub_date_raw = it.findtext("pubDate", "")
+
+          # Parsing chronologique précis
+          parsed_timestamp = 0
+          display_date = ""
+          if pub_date_raw:
+            try:
+              parsed_dt = email.utils.parsedate_to_datetime(pub_date_raw)
+              parsed_timestamp = parsed_dt.timestamp()
+              display_date = parsed_dt.strftime("%d/%m %H:%M")
+            except Exception:
+              display_date = pub_date_raw[:16]
+
           if title and link:
             news.append({
                 "ticker": tk,
                 "title": title,
                 "link": link,
-                "pubDate": pub_date[:16] if pub_date else "",
+                "pubDate": display_date,
+                "timestamp": parsed_timestamp,
             })
     except Exception:
       continue
-  return news[:8]
+
+  # Tri chronologique décroissant (les actualités les plus récentes en tête)
+  news.sort(key=lambda x: x["timestamp"], reverse=True)
+  return news[:10]
 
 
 def search_yahoo(query):
@@ -615,7 +617,7 @@ with tab_brief:
         )
 
     with c_news:
-      st.markdown("##### Dépêches financières (Lignes détenues)")
+      st.markdown("##### Dépêches financières (Chronologique)")
       active_tickers = df_positions["ticker"].tolist()
       news_items = get_portfolio_news_rss(active_tickers)
 
@@ -639,10 +641,11 @@ with tab_brief:
         st.caption("Synchronisation du flux financier en cours...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE & ORDRES
+# ONGLET 2 : PORTEFEUILLE & ORDRES (TABLEAU ÉLARGI)
 # ====================================================
 with tab_holdings:
-  col_saisie, col_table = st.columns([1, 2], gap="large")
+  # Élargissement du ratio de colonnes de [1, 2] à [1, 2.8]
+  col_saisie, col_table = st.columns([1, 2.8], gap="large")
 
   with col_saisie:
     st.markdown("#### Nouvel ordre")
@@ -773,7 +776,7 @@ with tab_holdings:
         rows.append(row)
 
       table_html = (
-          "<div class='glass-card' style='padding:0px; overflow-x:auto;'>"
+          "<div class='glass-card' style='padding:0px; overflow-x:auto; width: 100%;'>"
           "<table class='custom-table'>"
           "<thead><tr>"
           "<th>Actif</th><th>Secteur</th><th>Quantité</th><th>PRU</th><th>Cours</th><th>Valorisation</th><th>Plus/Moins-value</th><th>Poids</th>"
@@ -983,8 +986,7 @@ with tab_analytics:
       st.plotly_chart(fig_twr, use_container_width=True)
 
     st.write("")
-    
-    # 3 colonnes d'analyse : Allocation, Contribution P&L et Multiple P/E
+
     c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
 
     with c_g1:
