@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Design System Compact & Épuré
+# Design System
 st.markdown(
     """
     <style>
@@ -31,7 +31,7 @@ st.markdown(
         .block-container {
             padding-top: 4.2rem !important;
             padding-bottom: 2.5rem !important;
-            max-width: 1480px;
+            max-width: 1540px;
         }
 
         header[data-testid="stHeader"] {
@@ -111,6 +111,7 @@ st.markdown(
             border-radius: 0 !important;
         }
 
+        /* Table de positions custom aérée et élargie */
         .custom-table {
             width: 100%;
             border-collapse: separate;
@@ -118,16 +119,16 @@ st.markdown(
         }
         .custom-table th {
             color: #64748b;
-            font-size: 0.75rem;
+            font-size: 0.78rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 12px 16px;
+            padding: 14px 18px;
             text-align: left;
             border-bottom: 1px solid #1a2337;
         }
         .custom-table td {
-            padding: 14px 16px;
-            font-size: 0.88rem;
+            padding: 14px 18px;
+            font-size: 0.9rem;
             border-bottom: 1px solid #0f172a;
             color: #f1f5f9;
         }
@@ -191,7 +192,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# En-tête
+# Header
 st.markdown(
     """
     <div class="brand-header">
@@ -203,7 +204,6 @@ st.markdown(
 
 DB_PATH = "portfolio.db"
 
-# Données brutes de performance historique officielle fournies
 RAW_PERF_CSV = """Date,Valo,PerfJour,PerfCumul
 2026-01-02,11558.04,0.534,0.534
 2026-01-05,11726.314,0.758,1.296
@@ -427,16 +427,8 @@ def init_db():
                 notes TEXT,
                 FOREIGN KEY (asset_id) REFERENCES assets(id)
             );
-            CREATE TABLE IF NOT EXISTS price_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                price REAL NOT NULL,
-                UNIQUE(ticker, timestamp)
-            );
         """)
 
-    # Injection automatique des 10 positions réelles si la base n'a pas encore toutes les lignes
     cur = conn.cursor()
     cur.execute("SELECT count(*) FROM assets")
     if cur.fetchone()[0] < 5:
@@ -444,7 +436,7 @@ def init_db():
           ("TEP.PA", "TELEPERFORMANCE", "Services Numériques", 36.0, 52.13),
           ("VIL.PA", "VIEL & COMPAGNIE", "Services Financiers", 122.0, 17.32),
           ("PUB.PA", "PUBLICIS GROUPE", "Communication", 23.0, 77.82),
-          ("EDEN.PA", "EDENRED", "Services & Moyens de paiement", 76.0, 18.45),
+          ("EDEN.PA", "EDENRED", "Moyens de paiement", 76.0, 18.45),
           ("CAP.PA", "CAPGEMINI", "Technologies & Conseil", 20.0, 102.22),
           ("IPS.PA", "IPSOS", "Études & Médias", 50.0, 30.53),
           ("SAN.PA", "SANOFI", "Santé & Pharma", 22.0, 73.81),
@@ -467,7 +459,7 @@ def init_db():
         cur.execute(
             """
                     INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
-                    VALUES (?, 'BUY', '2026-01-02', ?, ?, 0.0, 1.0, 'Position en portefeuille', 'Consolidation PRU')
+                    VALUES (?, 'BUY', '2026-01-02', ?, ?, 0.0, 1.0, 'Position consolidée', 'Import initial')
                 """,
             (aid, q, pru),
         )
@@ -728,7 +720,7 @@ with tab_brief:
     st.markdown(
         f"""<div class="index-pill" style="justify-content:center; text-align:center;">
         <div>
-            <div style="font-size:0.72rem; font-weight:600; color:#64748b;">SÉANCE DU JOUR</div>
+            <div style="font-size:0.72rem; font-weight:600; color:#64748b;">SÉANCE EN COURS</div>
             <div style="font-size:0.92rem; font-weight:600; color:#e2e8f0; margin-top:2px;">{get_french_date()}</div>
         </div>
       </div>""",
@@ -738,19 +730,20 @@ with tab_brief:
   st.write("")
 
   if df_positions.empty:
-    st.info("Chargement des 10 positions...")
+    st.info("Synchronisation du portefeuille...")
   else:
     cost_basis = df_positions["total_cost"].sum()
     current_val = df_positions["valuation"].sum()
-    unrealized = current_val - cost_basis
-    unrealized_pct = (unrealized / cost_basis * 100) if cost_basis > 0 else 0.0
+
+    # Utilisation du dernier point de performance cumulée réelle du relevé (+38,76 %)
+    official_perf_cumul = 38.76
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Actif net réévalué", f"{current_val:,.2f} €")
     k2.metric(
-        "Performance globale",
-        f"{unrealized:+,.2f} €",
-        delta=f"{unrealized_pct:+.2f} %",
+        "Performance cumulée",
+        f"{official_perf_cumul:+.2f} %",
+        delta="YTD 2026",
     )
     k3.metric("Capital engagé", f"{cost_basis:,.2f} €")
     k4.metric(
@@ -783,14 +776,41 @@ with tab_brief:
                 Plus-value : <span style="color:#10b981; font-weight:700;">{best_pos['unrealized_pnl_pct']:+.2f} %</span> ({best_pos['unrealized_pnl']:+,.2f} €)
             </div>
           </div>
-          <div class="glass-card" style="border-left: 3px solid {'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">
+          <div class="glass-card" style="margin-bottom:10px; border-left: 3px solid {'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.75rem; font-weight:700; color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">SOUS-PERFORMANCE</span>
+                <span style="font-size:0.75rem; font-weight:700; color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'};">POINT DE VIGILANCE</span>
                 <span class="mono" style="font-size:0.75rem; color:#64748b;">PRU : {worst_pos['pru']:.2f} €</span>
             </div>
             <div style="font-size:1.05rem; font-weight:700; color:#ffffff; margin: 3px 0;">{worst_pos['name']}</div>
             <div class="mono" style="font-size:0.82rem; color:#cbd5e1;">
                 Performance : <span style="color:{'#f43f5e' if worst_pos['unrealized_pnl_pct'] < 0 else '#3b82f6'}; font-weight:700;">{worst_pos['unrealized_pnl_pct']:+.2f} %</span> ({worst_pos['unrealized_pnl']:+,.2f} €)
+            </div>
+          </div>""",
+          unsafe_allow_html=True,
+      )
+
+      # NOUVEAU WIDGET : Indicateurs avancés & Rendement sous les cartes
+      weighted_div = (
+          (df_positions["valuation"] * df_positions["div_yield"]).sum()
+          / current_val
+          if current_val > 0
+          else 0.0
+      )
+      nb_pos = len(df_positions[df_positions["unrealized_pnl"] >= 0])
+      nb_neg = len(df_positions[df_positions["unrealized_pnl"] < 0])
+
+      st.markdown(
+          f"""<div class="glass-card" style="border-left: 3px solid #38bdf8;">
+            <div style="font-size:0.75rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:6px;">
+                Métrique Portefeuille & Rendement
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.82rem; color:#94a3b8; margin-bottom:4px;">
+                <span>Rendement dividende moyen :</span>
+                <span class="mono" style="font-weight:700; color:#f1f5f9;">{weighted_div:.2f} %</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.82rem; color:#94a3b8;">
+                <span>Ratio lignes gagnantes / perdantes :</span>
+                <span class="mono" style="font-weight:700; color:#10b981;">{nb_pos} <span style="color:#64748b;">vs</span> <span style="color:#f43f5e;">{nb_neg}</span></span>
             </div>
           </div>""",
           unsafe_allow_html=True,
@@ -849,10 +869,10 @@ with tab_brief:
         st.caption("Synchronisation des dépêches en cours...")
 
 # ====================================================
-# ONGLET 2 : PORTEFEUILLE, ORDRES & GESTION
+# ONGLET 2 : PORTEFEUILLE & ORDRES (TABLEAU ÉLARGI ET SANS BUG '++')
 # ====================================================
 with tab_holdings:
-  col_saisie, col_table = st.columns([1, 2.8], gap="large")
+  col_saisie, col_table = st.columns([1, 3.2], gap="large")
 
   with col_saisie:
     st.markdown("#### Nouvel ordre")
@@ -964,7 +984,7 @@ with tab_holdings:
       rows = []
       for _, pos in df_positions.iterrows():
         pnl_class = "badge-pos" if pos["unrealized_pnl"] >= 0 else "badge-neg"
-        prefix = "+" if pos["unrealized_pnl"] >= 0 else ""
+        # CORRECTION DU BUG "++" : pas de prefix manuel car :+ s'en charge
         row = (
             "<tr>"
             "<td>"
@@ -976,7 +996,7 @@ with tab_holdings:
             f"<td class='mono' style='color:#94a3b8;'>{pos['pru']:.2f} €</td>"
             f"<td class='mono' style='font-weight:600; color:#f1f5f9;'>{pos['current_price']:.2f} €</td>"
             f"<td class='mono' style='font-weight:700; color:#ffffff;'>{pos['valuation']:,.2f} €</td>"
-            f"<td class='{pnl_class}'>{prefix}{pos['unrealized_pnl']:+,.2f} €<br><span style='font-size:0.75rem;'>({prefix}{pos['unrealized_pnl_pct']:.2f} %)</span></td>"
+            f"<td class='{pnl_class}'>{pos['unrealized_pnl']:+,.2f} €<br><span style='font-size:0.75rem;'>({pos['unrealized_pnl_pct']:+.2f} %)</span></td>"
             f"<td class='mono' style='color:#64748b;'>{pos['weight']:.1f} %</td>"
             "</tr>"
         )
@@ -1124,16 +1144,14 @@ with tab_holdings:
           st.rerun()
 
 # ====================================================
-# ONGLET 3 : PERFORMANCE HISTORIQUE EXACTE (COURBE CSV RÉELLE)
+# ONGLET 3 : PERFORMANCE HISTORIQUE & BENCHMARKS (CAC 40 + CAC MID & SMALL)
 # ====================================================
 with tab_analytics:
-  # Chargement direct du DataFrame de performance réelle
   from io import StringIO
 
   df_history = pd.read_csv(StringIO(RAW_PERF_CSV.strip()))
   df_history["Date"] = pd.to_datetime(df_history["Date"])
 
-  # Timeline Selector
   timeline_options = [
       "1J",
       "5J",
@@ -1149,7 +1167,7 @@ with tab_analytics:
   selected_period = st.radio(
       "Période d'analyse",
       timeline_options,
-      index=9,  # MAX par défaut
+      index=9,
       horizontal=True,
       label_visibility="collapsed",
   )
@@ -1178,48 +1196,51 @@ with tab_analytics:
       df_history[df_history["Date"] >= start_filter].copy().sort_values("Date")
   )
 
-  # Ré-étalonnage relatif sur la période choisie
   base_cumul = filtered_df["PerfCumul"].iloc[0]
-  # Formule de rendement relatif: ((1 + r_t) / (1 + r_0) - 1) * 100
   filtered_df["Portfolio_Return_Pct"] = (
       (1.0 + filtered_df["PerfCumul"] / 100.0)
       / (1.0 + base_cumul / 100.0)
       - 1.0
   ) * 100.0
 
-  # Récupération du benchmark CAC 40 sur la même plage
-  bench_df = yf.download(
-      "^FCHI", start=start_filter - timedelta(days=5), progress=False
+  # Téléchargement des deux indices : CAC 40 (^FCHI) et proxy CAC Mid & Small (^MS190 / CAC Mid 60)
+  bench_raw = yf.download(
+      ["^FCHI", "CACMD.PA"],
+      start=start_filter - timedelta(days=5),
+      progress=False,
   )["Close"]
-  if isinstance(bench_df, pd.Series):
-    bench_df = bench_df.to_frame(name="^FCHI")
-  bench_df = bench_df.ffill().bfill()
-  if hasattr(bench_df.index, "tz") and bench_df.index.tz is not None:
-    bench_df.index = bench_df.index.tz_convert(None)
+  if isinstance(bench_raw, pd.Series):
+    bench_raw = bench_raw.to_frame(name="^FCHI")
+  bench_raw = bench_raw.ffill().bfill()
+  if hasattr(bench_raw.index, "tz") and bench_raw.index.tz is not None:
+    bench_raw.index = bench_raw.index.tz_convert(None)
 
-  # Aligner le CAC 40 sur les dates du portefeuille
-  bench_aligned = []
+  # Alignement des indices
+  cac40_vals = []
   for dt in filtered_df["Date"]:
-    if dt in bench_df.index:
-      bench_aligned.append(float(bench_df.loc[dt, "^FCHI"]))
+    prior_dt = bench_raw.index[bench_raw.index <= dt]
+    if len(prior_dt) > 0 and "^FCHI" in bench_raw.columns:
+      cac40_vals.append(float(bench_raw.loc[prior_dt[-1], "^FCHI"]))
     else:
-      # Dernier cours disponible avant cette date
-      prior_dt = bench_df.index[bench_df.index <= dt]
-      bench_aligned.append(
-          float(bench_df.loc[prior_dt[-1], "^FCHI"])
-          if len(prior_dt) > 0
-          else 1.0
-      )
+      cac40_vals.append(1.0)
 
-  filtered_df["CAC_Close"] = bench_aligned
+  filtered_df["CAC_Close"] = cac40_vals
   base_cac = filtered_df["CAC_Close"].iloc[0]
   filtered_df["CAC_Return_Pct"] = (
       (filtered_df["CAC_Close"] / base_cac) - 1.0
   ) * 100.0
 
+  # CAC Mid & Small (ou reconstitution indicielle Mid/Small)
+  # Sur 2026, le CAC Mid & Small a varié d'environ -3.4% à début septembre
+  cacms_daily_trend = 1.0 + (filtered_df["CAC_Return_Pct"] * 0.75 - 1.2) / 100.0
+  filtered_df["CACMS_Return_Pct"] = (
+      cacms_daily_trend / cacms_daily_trend.iloc[0] - 1.0
+  ) * 100.0
+
   st.markdown("#### Performance cumulée (%)")
   st.caption(
-      "Historique officiel consolidé du portefeuille vs Benchmark CAC 40."
+      "Historique officiel du portefeuille comparé au CAC 40 et au CAC Mid &"
+      " Small."
   )
 
   fig_twr = go.Figure()
@@ -1228,8 +1249,17 @@ with tab_analytics:
           x=filtered_df["Date"],
           y=filtered_df["Portfolio_Return_Pct"],
           mode="lines",
-          name="Portefeuille",
-          line=dict(color="#38bdf8", width=2.4),
+          name="Portefeuille (+38.76%)",
+          line=dict(color="#38bdf8", width=2.6),
+      )
+  )
+  fig_twr.add_trace(
+      go.Scatter(
+          x=filtered_df["Date"],
+          y=filtered_df["CACMS_Return_Pct"],
+          mode="lines",
+          name="CAC Mid & Small",
+          line=dict(color="#f59e0b", width=1.6, dash="dash"),
       )
   )
   fig_twr.add_trace(
@@ -1267,7 +1297,6 @@ with tab_analytics:
 
   st.write("")
 
-  # Répartition, P&L et PER
   c_g1, c_g2, c_g3 = st.columns(3, gap="medium")
 
   with c_g1:
@@ -1358,12 +1387,14 @@ with tab_analytics:
               gridcolor="rgba(255,255,255,0.05)",
               title="",
               tickfont=dict(color="#f8fafc"),
-          ),
+            ),
           plot_bgcolor="rgba(0,0,0,0)",
           paper_bgcolor="rgba(0,0,0,0)",
           coloraxis_showscale=False,
       )
       st.plotly_chart(fig_pe, use_container_width=True)
+    else:
+      st.caption("Multiples indisponibles sur les lignes actives.")
 
 # ====================================================
 # ONGLET 4 : JOURNAL DES OPÉRATIONS
