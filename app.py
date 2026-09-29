@@ -7,94 +7,88 @@ import requests
 import streamlit as st
 import yfinance as yf
 
-# ==========================================
-# CONFIGURATION DE LA PAGE & STYLE
-# ==========================================
+# Configuration
 st.set_page_config(
-    page_title="Gestion de Portefeuille",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="Portfolio Analytics", layout="wide", initial_sidebar_state="collapsed"
 )
 
-# ==========================================
-# INITIALISATION & CONNEXION BDD
-# ==========================================
+# Style sobre et moderne sans fioritures
+st.markdown(
+    """
+    <style>
+        .block-container { padding-top: 2rem; padding-bottom: 2rem; }
+        [data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: 600; }
+        .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+        .stTabs [data-baseweb="tab"] {
+            padding: 8px 16px;
+            border-radius: 6px;
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 DB_PATH = "portfolio.db"
 
 
 def get_connection():
-  return sqlite3.connect(DB_PATH, check_same_thread=False)
+  conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+  conn.row_factory = sqlite3.Row
+  return conn
 
 
 def init_db():
-  conn = get_connection()
-  conn.executescript("""
-    CREATE TABLE IF NOT EXISTS assets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ticker TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        isin TEXT,
-        currency TEXT DEFAULT 'EUR',
-        sector TEXT
-    );
-    CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        asset_id INTEGER NOT NULL,
-        type TEXT NOT NULL,
-        date TEXT NOT NULL,
-        quantity REAL NOT NULL,
-        price REAL NOT NULL,
-        fees REAL DEFAULT 0.0,
-        exchange_rate REAL DEFAULT 1.0,
-        reason TEXT,
-        notes TEXT,
-        FOREIGN KEY (asset_id) REFERENCES assets(id)
-    );
-    """)
-  conn.commit()
-  conn.close()
+  with get_connection() as conn:
+    conn.executescript("""
+            CREATE TABLE IF NOT EXISTS assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                currency TEXT DEFAULT 'EUR',
+                sector TEXT
+            );
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                date TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                price REAL NOT NULL,
+                fees REAL DEFAULT 0.0,
+                exchange_rate REAL DEFAULT 1.0,
+                reason TEXT,
+                notes TEXT,
+                FOREIGN KEY (asset_id) REFERENCES assets(id)
+            );
+        """)
 
 
 init_db()
 
-# ==========================================
-# FONCTIONS API YAHOO FINANCE
-# ==========================================
 
-
-@st.cache_data(ttl=3600)
-def search_yahoo_tickers(query):
-  """Recherche auto-complétée d'actions via l'API Yahoo Finance."""
+def search_yahoo(query):
   if not query or len(query) < 2:
     return []
-  url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=8&newsCount=0"
-  headers = {"User-Agent": "Mozilla/5.0"}
+  url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=6&newsCount=0"
   try:
-    r = requests.get(url, headers=headers, timeout=5)
-    data = r.json()
-    results = []
+    res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+    data = res.json()
+    items = []
     for q in data.get("quotes", []):
       if q.get("quoteType") in ["EQUITY", "ETF"]:
-        symbol = q.get("symbol")
-        name = q.get("longname") or q.get("shortname") or symbol
-        exch = q.get("exchDisp", "")
-        sector = q.get("sector", "Non renseigné")
-        results.append({
-            "label": f"{name} ({symbol} - {exch})",
-            "symbol": symbol,
-            "name": name,
-            "sector": sector,
+        items.append({
+            "ticker": q.get("symbol"),
+            "name": q.get("longname") or q.get("shortname") or q.get("symbol"),
+            "sector": q.get("sector", "Industrie / Services"),
         })
-    return results
+    return items
   except Exception:
     return []
 
 
-@st.cache_data(ttl=900)
-def get_live_market_data(tickers):
-  """Récupère les cours actuels et les ratios fondamentaux (PER, Dividende, etc.)."""
-  data = {}
+def fetch_live_quotes(tickers):
+  quotes = {}
   for t in tickers:
     try:
       tk = yf.Ticker(t)
@@ -105,507 +99,340 @@ def get_live_market_data(tickers):
           or info.get("previousClose")
           or 0.0
       )
-      data[t] = {
+      quotes[t] = {
           "price": float(price),
-          "currency": info.get("currency", "EUR"),
-          "sector": info.get("sector") or "Autre",
-          "pe": info.get("trailingPE", None),
-          "forward_pe": info.get("forwardPE", None),
-          "div_yield": (info.get("dividendYield") or 0.0) * 100,
-          "day_change": info.get("regularMarketChangePercent", 0.0),
+          "pe": info.get("trailingPE"),
+          "yield": (info.get("dividendYield") or 0.0) * 100,
+          "sector": info.get("sector") or "Non classé",
       }
     except Exception:
-      data[t] = {
-          "price": 0.0,
-          "currency": "EUR",
-          "sector": "Autre",
-          "pe": None,
-          "forward_pe": None,
-          "div_yield": 0.0,
-          "day_change": 0.0,
-      }
-  return data
+      quotes[t] = {"price": 0.0, "pe": None, "yield": 0.0, "sector": "Non classé"}
+  return quotes
 
 
-# ==========================================
-# CALCULS DU PORTEFEUILLE
-# ==========================================
-
-
-def load_portfolio_summary():
-  conn = get_connection()
-  df_tx = pd.read_sql_query(
-      """
-        SELECT t.*, a.ticker, a.name, a.sector, a.currency 
-        FROM transactions t
-        JOIN assets a ON t.asset_id = a.id
-        ORDER BY t.date ASC
-    """,
-      conn,
-  )
-  conn.close()
+def get_portfolio_data():
+  with get_connection() as conn:
+    df_tx = pd.read_sql_query(
+        """
+            SELECT t.id, t.type, t.date, t.quantity, t.price, t.fees, t.exchange_rate, 
+                   t.reason, t.notes, a.ticker, a.name, a.sector
+            FROM transactions t
+            JOIN assets a ON t.asset_id = a.id
+            ORDER BY t.date ASC, t.id ASC
+        """,
+        conn,
+    )
 
   if df_tx.empty:
     return pd.DataFrame(), pd.DataFrame()
 
   positions = {}
-  for _, row in df_tx.iterrows():
-    tk = row["ticker"]
+  for _, tx in df_tx.iterrows():
+    tk = tx["ticker"]
     if tk not in positions:
       positions[tk] = {
           "ticker": tk,
-          "name": row["name"],
-          "sector": row["sector"],
-          "currency": row["currency"],
-          "qty": 0.0,
+          "name": tx["name"],
+          "sector": tx["sector"],
+          "quantity": 0.0,
           "total_cost": 0.0,
-          "dividends": 0.0,
+          "realized_pnl": 0.0,
       }
-    p = positions[tk]
-    if row["type"] == "BUY":
-      cost = (row["quantity"] * row["price"] + row["fees"]) * row[
-          "exchange_rate"
-      ]
-      p["total_cost"] += cost
-      p["qty"] += row["quantity"]
-    elif row["type"] == "SELL":
-      if p["qty"] > 0:
-        pru_actuel = p["total_cost"] / p["qty"]
-        p["qty"] -= row["quantity"]
-        p["total_cost"] = max(0.0, p["qty"] * pru_actuel)
-    elif row["type"] == "DIVIDEND":
-      p["dividends"] += (row["quantity"] * row["price"] - row["fees"]) * row[
-          "exchange_rate"
-      ]
 
-  # Filtrer les positions actives
-  active_pos = [v for v in positions.values() if v["qty"] > 0.0001]
-  if not active_pos:
+    pos = positions[tk]
+    q, p, f = float(tx["quantity"]), float(tx["price"]), float(tx["fees"])
+
+    if tx["type"] == "BUY":
+      pos["total_cost"] += (q * p) + f
+      pos["quantity"] += q
+    elif tx["type"] == "SELL":
+      if pos["quantity"] > 0:
+        avg_cost = pos["total_cost"] / pos["quantity"]
+        pos["realized_pnl"] += (p - avg_cost) * q - f
+        pos["quantity"] -= q
+        pos["total_cost"] = max(0.0, pos["quantity"] * avg_cost)
+
+  active = [p for p in positions.values() if p["quantity"] > 0.0001]
+  if not active:
     return pd.DataFrame(), df_tx
 
-  df_pos = pd.DataFrame(active_pos)
-  market_data = get_live_market_data(df_pos["ticker"].tolist())
+  df_pos = pd.DataFrame(active)
+  live = fetch_live_quotes(df_pos["ticker"].tolist())
 
-  df_pos["PRU (€)"] = df_pos["total_cost"] / df_pos["qty"]
-  df_pos["Cours Actuel"] = df_pos["ticker"].map(lambda x: market_data[x]["price"])
-  df_pos["Var. Jour (%)"] = df_pos["ticker"].map(
-      lambda x: market_data[x]["day_change"]
+  df_pos["pru"] = df_pos["total_cost"] / df_pos["quantity"]
+  df_pos["current_price"] = df_pos["ticker"].map(
+      lambda x: live.get(x, {}).get("price", 0.0)
   )
-  df_pos["PER"] = df_pos["ticker"].map(lambda x: market_data[x]["pe"])
-  df_pos["Rendement (%)"] = df_pos["ticker"].map(
-      lambda x: market_data[x]["div_yield"]
+  df_pos["pe"] = df_pos["ticker"].map(lambda x: live.get(x, {}).get("pe"))
+  df_pos["div_yield"] = df_pos["ticker"].map(
+      lambda x: live.get(x, {}).get("yield", 0.0)
   )
 
-  df_pos["Valorisation (€)"] = df_pos["qty"] * df_pos["Cours Actuel"]
-  df_pos["+/- Value Latente (€)"] = (
-      df_pos["Valorisation (€)"] - df_pos["total_cost"]
-  )
-  df_pos["+/- Value (%)"] = (
-      df_pos["+/- Value Latente (€)"] / df_pos["total_cost"]
+  df_pos["valuation"] = df_pos["quantity"] * df_pos["current_price"]
+  df_pos["unrealized_pnl"] = df_pos["valuation"] - df_pos["total_cost"]
+  df_pos["unrealized_pnl_pct"] = (
+      df_pos["unrealized_pnl"] / df_pos["total_cost"]
   ) * 100
 
-  total_val = df_pos["Valorisation (€)"].sum()
-  df_pos["Poids (%)"] = (
-      (df_pos["Valorisation (€)"] / total_val * 100) if total_val > 0 else 0.0
-  )
+  tot_val = df_pos["valuation"].sum()
+  df_pos["weight"] = (df_pos["valuation"] / tot_val * 100) if tot_val > 0 else 0.0
 
   return df_pos, df_tx
 
 
-# ==========================================
-# INTERFACE PRINCIPALE
-# ==========================================
+# Navigation
+tab_overview, tab_holdings, tab_analytics = st.tabs(
+    ["Vue d'ensemble", "Portefeuille & Saisie", "Historique & Performance"]
+)
+df_positions, df_transactions = get_portfolio_data()
 
-st.title("📊 Terminal de Gestion de Portefeuille")
-
-df_pos, df_tx = load_portfolio_summary()
-
-tab_home, tab_portfolio, tab_perf = st.tabs([
-    "🏠 Accueil & Vue d'ensemble",
-    "💼 Portefeuille & Ordres",
-    "📈 Performance & Journal",
-])
-
-# ------------------------------------------
-# ONGLET 1 : ACCUEIL
-# ------------------------------------------
-with tab_home:
-  if df_pos.empty:
+# ----------------------------------------------------
+# ONGLET 1 : VUE D'ENSEMBLE
+# ----------------------------------------------------
+with tab_overview:
+  if df_positions.empty:
     st.info(
-        "👋 Bienvenue sur ton espace ! Ton portefeuille est vide pour"
-        " l'instant. Rendez-vous dans l'onglet **💼 Portefeuille & Ordres**"
-        " pour ajouter ta première ligne."
+        "Portefeuille inactif. Ajoutez une transaction dans l'onglet"
+        " Portefeuille pour activer les métriques."
     )
   else:
-    total_investi = df_pos["total_cost"].sum()
-    total_valo = df_pos["Valorisation (€)"].sum()
-    pv_latente = total_valo - total_investi
-    pv_pct = (pv_latente / total_investi * 100) if total_investi > 0 else 0.0
-    total_div = df_pos["dividends"].sum()
-    rendement_moyen = (
-        df_pos["Valorisation (€)"] * df_pos["Rendement (%)"]
-    ).sum() / total_valo
-
-    # Bandeau de KPIs
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric(
-        "💰 Valorisation Totale",
-        f"{total_valo:,.2f} €",
-        f"{pv_latente:+,.2f} €",
-    )
-    col2.metric(
-        "📈 Performance Latente",
-        f"{pv_pct:+.2f} %",
-        f"Investi : {total_investi:,.2f} €",
-    )
-    col3.metric(
-        "🎁 Dividendes Perçus",
-        f"{total_div:,.2f} €",
-        f"Rdt estimé : {rendement_moyen:.2f} %/an",
-    )
-    col4.metric(
-        "🏢 Lignes en Portefeuille",
-        f"{len(df_pos)} valeurs",
-        f"{df_pos['sector'].nunique()} secteurs",
+    cost_basis = df_positions["total_cost"].sum()
+    current_val = df_positions["valuation"].sum()
+    unrealized = current_val - cost_basis
+    unrealized_pct = (unrealized / cost_basis * 100) if cost_basis > 0 else 0.0
+    weighted_yield = (
+        (df_positions["valuation"] * df_positions["div_yield"]).sum()
+        / current_val
+        if current_val > 0
+        else 0.0
     )
 
-    st.divider()
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Valorisation globale", f"{current_val:,.2f} €")
+    kpi2.metric(
+        "Plus/Moins-value latente",
+        f"{unrealized:+,.2f} €",
+        delta=f"{unrealized_pct:+.2f} %",
+    )
+    kpi3.metric("Capital net investi", f"{cost_basis:,.2f} €")
+    kpi4.metric("Rendement dividende moyen", f"{weighted_yield:.2f} %")
 
-    # Graphiques de répartition
-    c_left, c_right = st.columns(2)
-    with c_left:
-      st.subheader("Répartition par Valeur")
-      fig_val = px.pie(
-          df_pos,
-          values="Valorisation (€)",
+    st.write("")
+    g1, g2 = st.columns(2)
+
+    with g1:
+      fig_donut = px.pie(
+          df_positions,
+          values="valuation",
           names="name",
-          hole=0.45,
-          color_discrete_sequence=px.colors.qualitative.Prism,
+          hole=0.55,
+          title="Exposition par actif",
+          color_discrete_sequence=px.colors.sequential.Teal,
       )
-      fig_val.update_traces(textposition="inside", textinfo="percent+label")
-      st.plotly_chart(fig_val, use_container_width=True)
+      fig_donut.update_layout(
+          margin=dict(t=40, b=10, l=10, r=10), showlegend=True
+      )
+      st.plotly_chart(fig_donut, use_container_width=True)
 
-    with c_right:
-      st.subheader("Allocation Sectorielle")
+    with g2:
       fig_sec = px.pie(
-          df_pos,
-          values="Valorisation (€)",
+          df_positions,
+          values="valuation",
           names="sector",
-          hole=0.45,
-          color_discrete_sequence=px.colors.qualitative.Safe,
+          hole=0.55,
+          title="Exposition sectorielle",
+          color_discrete_sequence=px.colors.sequential.Blues_r,
       )
-      fig_sec.update_traces(textposition="inside", textinfo="percent+label")
+      fig_sec.update_layout(
+          margin=dict(t=40, b=10, l=10, r=10), showlegend=True
+      )
       st.plotly_chart(fig_sec, use_container_width=True)
 
-    # Radar Fondamental Value
-    st.subheader("🔍 Radar Fondamental des Lignes (Temps réel Yahoo Finance)")
-    df_fund = df_pos[[
-        "name",
-        "ticker",
-        "sector",
-        "Cours Actuel",
-        "PER",
-        "Rendement (%)",
-        "Poids (%)",
-    ]].copy()
-    st.dataframe(
-        df_fund.style.format({
-            "Cours Actuel": "{:.2f} €",
-            "PER": lambda x: f"{x:.1f}x" if pd.notnull(x) else "N/A",
-            "Rendement (%)": "{:.2f} %",
-            "Poids (%)": "{:.1f} %",
-        }),
-        use_container_width=True,
-        hide_index=True,
+# ----------------------------------------------------
+# ONGLET 2 : PORTEFEUILLE & TRANSACTION
+# ----------------------------------------------------
+with tab_holdings:
+  col_saisie, col_table = st.columns([1, 2], gap="large")
+
+  with col_saisie:
+    st.subheader("Enregistrer une opération")
+
+    search_input = st.text_input(
+        "Rechercher un actif",
+        placeholder="Tapez le nom ou ticker (ex: Eiffage, ALO.PA)...",
     )
+    search_results = search_yahoo(search_input)
 
-# ------------------------------------------
-# ONGLET 2 : PORTEFEUILLE & AJOUT D'ORDRES
-# ------------------------------------------
-with tab_portfolio:
-  col_form, col_table = st.columns([1, 2])
+    selected_asset = None
+    if search_results:
+      options = {
+          f"{item['name']} ({item['ticker']})": item for item in search_results
+      }
+      picked_label = st.selectbox("Sélectionner la valeur :", list(options.keys()))
+      selected_asset = options[picked_label]
 
-  with col_form:
-    st.subheader("➕ Enregistrer un mouvement")
-
-    # 1. Barre de recherche intelligente hors formulaire pour auto-complétion directe
-    search_query = st.text_input(
-        "🔎 Rechercher une action (ex: Eiffage, Alstom, Viel, Sanofi...)"
-    )
-    suggestions = search_yahoo_tickers(search_query)
-
-    selected_stock = None
-    if suggestions:
-      labels = [s["label"] for s in suggestions]
-      choice = st.selectbox("Valeurs proposées :", labels)
-      selected_stock = next(s for s in suggestions if s["label"] == choice)
-
-    # 2. Formulaire de transaction
-    with st.form("add_tx_form", clear_on_submit=True):
-      tx_type = st.selectbox(
-          "Type d'opération",
-          ["BUY", "SELL", "DIVIDEND"],
-          format_func=lambda x: {
-              "BUY": "🟢 Achat",
-              "SELL": "🔴 Vente",
-              "DIVIDEND": "🎁 Dividende",
-          }[x],
+    with st.form("tx_entry_form", clear_on_submit=True):
+      op_type = st.selectbox(
+          "Type d'ordre", ["Achat (BUY)", "Vente (SELL)", "Dividende (DIVIDEND)"]
       )
-      tx_date = st.date_input("Date de l'ordre", value=datetime.today())
+      op_date = st.date_input("Date d'exécution", value=datetime.today())
 
-      c1, c2 = st.columns(2)
-      qty = c1.number_input("Quantité", min_value=0.0001, value=1.0, step=1.0)
-      price = c2.number_input(
-          "Prix unitaire (€)", min_value=0.0001, value=100.0, step=0.5
+      c_q, c_p = st.columns(2)
+      quantity = c_q.number_input(
+          "Quantité", min_value=0.0001, value=1.0, step=1.0
+      )
+      price = c_p.number_input(
+          "Prix d'exécution (€)", min_value=0.0001, value=100.0, step=0.1
       )
 
-      c3, c4 = st.columns(2)
-      fees = c3.number_input(
-          "Frais de courtage (€)", min_value=0.0, value=0.0, step=0.5
-      )
-      fx = c4.number_input(
-          "Taux de change (1 si EUR)", min_value=0.0001, value=1.0
+      c_f, c_fx = st.columns(2)
+      fees = c_f.number_input("Frais d'ordre (€)", min_value=0.0, value=0.0)
+      fx_rate = c_fx.number_input(
+          "Taux de change (si hors EUR)", min_value=0.0001, value=1.0
       )
 
-      reason = st.selectbox(
-          "Motif principal",
-          [
-              "Ouverture de ligne (Value / Décote)",
-              "Renforcement sur repli",
-              "Croissance / Momentum",
-              "Prise de bénéfices",
-              "Invalidation de la thèse",
-              "Dividende",
-          ],
+      reason = st.text_input(
+          "Motif d'arbitrage",
+          placeholder="Ex: Valorisation attractive, renforcement...",
       )
       notes = st.text_area(
-          "Thèse d'investissement & Ratios clés (PER, ROCE, FCF...)",
-          placeholder=(
-              "Ex: Acheté à PER 9x suite crainte surtaxe autoroutes, FCF"
-              " solide..."
-          ),
+          "Thèse d'investissement / Détails fondamentaux",
+          placeholder="PER cible, catalyseurs opérationnels, free cash flow...",
       )
 
-      submitted = st.form_submit_button(
-          "Valider et enregistrer en BDD", use_container_width=True
+      submit = st.form_submit_button(
+          "Enregistrer l'opération", use_container_width=True
       )
 
-      if submitted:
-        if not selected_stock:
+      if submit:
+        if not selected_asset:
           st.error(
-              "⚠️ Recherche et sélectionne d'abord une valeur dans la barre"
-              " ci-dessus."
+              "Veuillez rechercher et sélectionner une action valide avant de"
+              " valider."
           )
         else:
-          tk_sym = selected_stock["symbol"]
-          tk_name = selected_stock["name"]
-
-          # Récupération automatique des vraies métadonnées via yfinance
-          try:
-            info = yf.Ticker(tk_sym).info
-            currency = info.get("currency", "EUR")
-            sector = info.get("sector") or selected_stock["sector"]
-          except Exception:
-            currency = "EUR"
-            sector = selected_stock["sector"]
-
-          conn = get_connection()
-          cur = conn.cursor()
-          cur.execute(
-              """
-                        INSERT INTO assets (ticker, name, currency, sector)
-                        VALUES (?, ?, ?, ?)
-                        ON CONFLICT(ticker) DO UPDATE SET sector=excluded.sector
-                    """,
-              (tk_sym, tk_name, currency, sector),
+          type_code = "BUY" if "Achat" in op_type else (
+              "SELL" if "Vente" in op_type else "DIVIDEND"
           )
+          with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                            INSERT INTO assets (ticker, name, sector)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT(ticker) DO UPDATE SET name=excluded.name, sector=excluded.sector
+                        """,
+                (
+                    selected_asset["ticker"],
+                    selected_asset["name"],
+                    selected_asset["sector"],
+                ),
+            )
 
-          cur.execute("SELECT id FROM assets WHERE ticker = ?", (tk_sym,))
-          asset_id = cur.fetchone()[0]
+            cur.execute(
+                "SELECT id FROM assets WHERE ticker = ?",
+                (selected_asset["ticker"],),
+            )
+            asset_id = cur.fetchone()[0]
 
-          cur.execute(
-              """
-                        INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-              (
-                  asset_id,
-                  tx_type,
-                  tx_date.strftime("%Y-%m-%d"),
-                  qty,
-                  price,
-                  fees,
-                  fx,
-                  reason,
-                  notes,
-              ),
-          )
+            cur.execute(
+                """
+                            INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                (
+                    asset_id,
+                    type_code,
+                    op_date.strftime("%Y-%m-%d"),
+                    quantity,
+                    price,
+                    fees,
+                    fx_rate,
+                    reason,
+                    notes,
+                ),
+            )
+            conn.commit()
 
-          conn.commit()
-          conn.close()
-          st.cache_data.clear()
-          st.success(f"✅ Ordre enregistré sur **{tk_name} ({tk_sym})** !")
+          st.success(f"Ordre enregistré pour {selected_asset['name']}.")
           st.rerun()
 
   with col_table:
-    st.subheader("📋 Mes Positions Actuelles")
-    if df_pos.empty:
-      st.write("Aucune position ouverte.")
+    st.subheader("Positions ouvertes")
+    if df_positions.empty:
+      st.write("Aucune position active.")
     else:
-      display_df = df_pos[[
+      view_df = df_positions[[
           "ticker",
           "name",
-          "qty",
-          "PRU (€)",
-          "Cours Actuel",
-          "Valorisation (€)",
-          "+/- Value Latente (€)",
-          "+/- Value (%)",
-          "Poids (%)",
+          "quantity",
+          "pru",
+          "current_price",
+          "valuation",
+          "unrealized_pnl",
+          "unrealized_pnl_pct",
+          "weight",
       ]].rename(
           columns={
               "ticker": "Ticker",
-              "name": "Entreprise",
-              "qty": "Qté",
+              "name": "Actif",
+              "quantity": "Quantité",
+              "pru": "PRU",
+              "current_price": "Dernier cours",
+              "valuation": "Valorisation",
+              "unrealized_pnl": "P&L (€)",
+              "unrealized_pnl_pct": "P&L (%)",
+              "weight": "Poids",
           }
       )
 
       st.dataframe(
-          display_df.style.format({
-              "Qté": "{:.2f}",
-              "PRU (€)": "{:.2f} €",
-              "Cours Actuel": "{:.2f} €",
-              "Valorisation (€)": "{:,.2f} €",
-              "+/- Value Latente (€)": "{:+,.2f} €",
-              "+/- Value (%)": "{:+.2f} %",
-              "Poids (%)": "{:.1f} %",
-          }).map(
-              lambda v: "color: #16a34a; font-weight: bold;"
-              if isinstance(v, (int, float)) and v > 0
-              else (
-                  "color: #dc2626; font-weight: bold;"
-                  if isinstance(v, (int, float)) and v < 0
-                  else ""
-              ),
-              subset=["+/- Value Latente (€)", "+/- Value (%)"],
-          ),
+          view_df.style.format({
+              "Quantité": "{:.2f}",
+              "PRU": "{:.2f} €",
+              "Dernier cours": "{:.2f} €",
+              "Valorisation": "{:,.2f} €",
+              "P&L (€)": "{:+,.2f} €",
+              "P&L (%)": "{:+.2f} %",
+              "Poids": "{:.1f} %",
+          }),
           use_container_width=True,
           hide_index=True,
       )
 
-      # Graphique Barres des +/- values par ligne
-      fig_bar = px.bar(
-          df_pos.sort_values("+/- Value (%)", ascending=True),
-          x="+/- Value (%)",
-          y="name",
-          orientation="h",
-          title="Performance latente par ligne (%)",
-          color="+/- Value (%)",
-          color_continuous_scale=["#dc2626", "#f3f4f6", "#16a34a"],
-          color_continuous_midpoint=0,
-      )
-      st.plotly_chart(fig_bar, use_container_width=True)
-
-# ------------------------------------------
-# ONGLET 3 : PERFORMANCE & JOURNAL
-# ------------------------------------------
-with tab_perf:
-  if df_tx.empty:
-    st.info(
-        "Ajoute des transactions pour générer la courbe de performance"
-        " historique."
-    )
+# ----------------------------------------------------
+# ONGLET 3 : HISTORIQUE & JOURNAL
+# ----------------------------------------------------
+with tab_analytics:
+  if df_transactions.empty:
+    st.write("Aucune transaction enregistrée.")
   else:
-    st.subheader(
-        "📈 Évolution de la Valorisation du Portefeuille vs Apports Cumulés"
+    st.subheader("Journal des opérations")
+    journal = df_transactions[[
+        "date",
+        "type",
+        "name",
+        "ticker",
+        "quantity",
+        "price",
+        "fees",
+        "reason",
+        "notes",
+    ]].rename(
+        columns={
+            "date": "Date",
+            "type": "Sens",
+            "name": "Actif",
+            "ticker": "Ticker",
+            "quantity": "Quantité",
+            "price": "Prix unitaire",
+            "fees": "Frais",
+            "reason": "Motif",
+            "notes": "Thèse / Ratios",
+        }
     )
-
-    # Reconstitution de la courbe historique depuis le 1er achat
-    start_date = pd.to_datetime(df_tx["date"].min()) - timedelta(days=2)
-    tickers_list = df_tx["ticker"].unique().tolist()
-
-    with st.spinner("Calcul de l'historique boursier en cours..."):
-      hist_prices = yf.download(
-          tickers_list, start=start_date, progress=False
-      )["Close"]
-      if isinstance(hist_prices, pd.Series):
-        hist_prices = hist_prices.to_frame(name=tickers_list[0])
-      hist_prices = hist_prices.ffill().bfill()
-
-      date_range = hist_prices.index
-      portfolio_history = []
-
-      for current_date in date_range:
-        sub_tx = df_tx[pd.to_datetime(df_tx["date"]) <= current_date]
-        invested = 0.0
-        val_jour = 0.0
-
-        for tk in tickers_list:
-          tk_tx = sub_tx[sub_tx["ticker"] == tk]
-          q_buy = tk_tx[tk_tx["type"] == "BUY"]["quantity"].sum()
-          q_sell = tk_tx[tk_tx["type"] == "SELL"]["quantity"].sum()
-          net_qty = max(0.0, q_buy - q_sell)
-
-          cost_buy = (
-              tk_tx[tk_tx["type"] == "BUY"]["quantity"]
-              * tk_tx[tk_tx["type"] == "BUY"]["price"]
-          ).sum()
-          cost_sell = (
-              tk_tx[tk_tx["type"] == "SELL"]["quantity"]
-              * tk_tx[tk_tx["type"] == "SELL"]["price"]
-          ).sum()
-          invested += max(0.0, cost_buy - cost_sell)
-
-          if net_qty > 0 and tk in hist_prices.columns:
-            px_day = hist_prices.loc[current_date, tk]
-            if pd.notnull(px_day):
-              val_jour += net_qty * float(px_day)
-
-        portfolio_history.append({
-            "Date": current_date,
-            "Valorisation Portefeuille (€)": val_jour,
-            "Capital Investi (€)": invested,
-        })
-
-      df_hist = pd.DataFrame(portfolio_history)
-
-      fig_perf = go.Figure()
-      fig_perf.add_trace(
-          go.Scatter(
-              x=df_hist["Date"],
-              y=df_hist["Valorisation Portefeuille (€)"],
-              mode="lines",
-              name="Valorisation (€)",
-              line=dict(color="#2563eb", width=2.5),
-              fill="tonexty",
-          )
-      )
-      fig_perf.add_trace(
-          go.Scatter(
-              x=df_hist["Date"],
-              y=df_hist["Capital Investi (€)"],
-              mode="lines",
-              name="Capital Investi (€)",
-              line=dict(color="#64748b", width=2, dash="dash"),
-          )
-      )
-      fig_perf.update_layout(hovermode="x unified", yaxis_title="Euros (€)")
-      st.plotly_chart(fig_perf, use_container_width=True)
-
-    st.divider()
-    st.subheader("📓 Journal des Ordres & Thèses d'Investissement")
     st.dataframe(
-        df_tx[[
-            "date",
-            "type",
-            "ticker",
-            "name",
-            "quantity",
-            "price",
-            "fees",
-            "reason",
-            "notes",
-        ]].sort_values("date", ascending=False),
+        journal.sort_values("Date", ascending=False),
         use_container_width=True,
         hide_index=True,
     )
