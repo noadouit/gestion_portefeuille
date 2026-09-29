@@ -592,8 +592,6 @@ def get_portfolio_data():
     if df_tx.empty:
         return pd.DataFrame(), pd.DataFrame(), 15.79, 0.0
 
-    # Base de cash calculée proprement à partir des versements de départ (13286.64) et des achats initiaux (15499.79)
-    # Pour éviter le négatif, on part du cash de départ 15.79 € + versements - achats + ventes + divs
     cash_balance = 15.79
     positions = {}
     realized_pnl_total = 0.0
@@ -601,6 +599,7 @@ def get_portfolio_data():
     for _, tx in df_tx.iterrows():
         t_type = tx["type"]
         q, p, f = float(tx["quantity"] or 0), float(tx["price"] or 0), float(tx["fees"] or 0)
+        reason = tx["reason"] or ""
 
         if t_type == "DIVIDEND":
             cash_balance += p
@@ -623,10 +622,15 @@ def get_portfolio_data():
             }
 
         pos = positions[tk]
+        
+        # Si c'est l'import initial (le bloc de base), on ne déduit pas le cash en double puisque le cash de départ est déjà fixé à 15.79 €
+        is_initial_import = (reason == "Import initial" or tx["date"] == "2026-01-02")
+
         if t_type == "BUY":
             pos["total_cost"] += (q * p) + f
             pos["quantity"] += q
-            cash_balance -= (q * p) + f
+            if not is_initial_import:
+                cash_balance -= (q * p) + f
         elif t_type == "SELL":
             if pos["quantity"] > 0:
                 avg_cost = pos["total_cost"] / pos["quantity"]
@@ -674,10 +678,6 @@ def get_portfolio_data():
 
 
 df_positions, df_transactions, cash_disponible, realized_pnl_calc = get_portfolio_data()
-
-# Si le cash calculé est négatif à cause de l'import initial, on le recale proprement sur les 15.87 € attendus
-if cash_disponible < 0:
-    cash_disponible = 15.87
 
 # Calcul de la variation journalière (1J) pondérée
 if not df_positions.empty and df_positions["valuation"].sum() > 0:
