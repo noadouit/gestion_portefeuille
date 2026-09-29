@@ -24,6 +24,11 @@ REAL_DATA_PASSWORD = "secret2026"
 # Plus-values réalisées : valeur de départ, ensuite modifiée uniquement par les ventes
 REALIZED_PNL_INITIAL = 1492.56
 
+# Cash de départ : seules les opérations postérieures à cette date l'affectent.
+# Tout ce qui est daté à cette date (ou avant) est considéré comme l'import initial.
+CASH_INITIAL = 15.79
+CASH_BASELINE_DATE = "2026-01-02"
+
 # Gestion de l'état d'authentification et de l'animation hacker
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -629,7 +634,7 @@ def get_portfolio_data():
     if df_tx.empty:
         return pd.DataFrame(), pd.DataFrame(), 15.79, 0.0
 
-    cash_balance = 15.79
+    cash_balance = CASH_INITIAL
     positions = {}
     realized_pnl_total = 0.0  # uniquement alimenté par les VENTES
 
@@ -661,7 +666,12 @@ def get_portfolio_data():
         pos = positions[tk]
 
         # L'import initial n'impacte pas le cash (le cash de départ est déjà fixé à 15.79 €)
-        is_initial_import = (notes == "Import initial")
+        reason_txt = tx["reason"] or ""
+        is_initial_import = (
+            notes == "Import initial"
+            or reason_txt in ("Import initial", "Position consolidée")
+            or str(tx["date"]) <= CASH_BASELINE_DATE
+        )
 
         if t_type == "BUY":
             pos["total_cost"] += (q * p) + f
@@ -1218,6 +1228,15 @@ with tab_holdings:
                     "Montant du dividende perçu (€)",
                     min_value=0.01, value=50.0, step=1.0,
                 )
+                # Action liée au dividende : facultatif
+                div_assets = {"Aucune (dividende général)": None}
+                if not df_positions.empty:
+                    for _, r in df_positions.iterrows():
+                        div_assets[f"{r['name']} ({r['ticker']})"] = int(r["asset_id"])
+                div_choice = st.selectbox(
+                    "Action concernée (facultatif)", list(div_assets.keys())
+                )
+                div_asset_id = div_assets[div_choice]
                 reason_div = st.text_input("Source / Notes", value="Versement dividende")
             else:
                 c_q, c_p = st.columns(2)
@@ -1256,9 +1275,9 @@ with tab_holdings:
                         cur.execute(
                             """
                             INSERT INTO transactions (asset_id, type, date, quantity, price, fees, exchange_rate, reason, notes)
-                            VALUES (NULL, 'DIVIDEND', ?, 0.0, ?, 0.0, 1.0, 'Dividende perçu', ?)
+                            VALUES (?, 'DIVIDEND', ?, 0.0, ?, 0.0, 1.0, 'Dividende perçu', ?)
                             """,
-                            (op_date.strftime("%Y-%m-%d"), div_amount, reason_div),
+                            (div_asset_id, op_date.strftime("%Y-%m-%d"), div_amount, reason_div),
                         )
                         conn.commit()
                         st.toast(f"Dividende de {div_amount:,.2f} € ajouté au cash.")
@@ -1414,7 +1433,8 @@ with tab_holdings:
             tx_options = {}
             for _, t in df_transactions.iterrows():
                 if t["type"] == "DIVIDEND":
-                    lbl = f"ID #{t['id']} — {t['date']} | DIVIDENDE reçu ({t['price']} €)"
+                    tk_lbl = f" {t['ticker']}" if t["ticker"] else ""
+                    lbl = f"ID #{t['id']} — {t['date']} | DIVIDENDE{tk_lbl} reçu ({t['price']} €)"
                 else:
                     q_disp = t['quantity'] * PRIVACY_RATIO
                     lbl = f"ID #{t['id']} — {t['date']} | {t['type']} {t['ticker']} ({q_disp:.2f} titres @ {t['price']:.2f} €)"
