@@ -1,4 +1,3 @@
-import base64
 import sqlite3
 import time
 from datetime import datetime, timedelta
@@ -19,17 +18,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mot de passe obfusqué (ne s'affiche plus en clair sur GitHub)
-_ENCODED_KEY = "c2VjcmV0MjAyNg=="  # Décode vers "secret2026"
-
-def get_authorized_password() -> str:
-    """Récupère le mot de passe depuis st.secrets (si configuré) ou via la clé obfusquée."""
-    try:
-        if "PORTFOLIO_PASSWORD" in st.secrets:
-            return str(st.secrets["PORTFOLIO_PASSWORD"])
-    except Exception:
-        pass
-    return base64.b64decode(_ENCODED_KEY.encode("utf-8")).decode("utf-8")
+# Mot de passe normal et modifiable directement ici
+REAL_DATA_PASSWORD = "secret2026"
 
 # Gestion de l'état d'authentification et de l'animation hacker
 if "authenticated" not in st.session_state:
@@ -680,7 +670,7 @@ day_badge_bg = "rgba(16, 185, 129, 0.12)" if day_perf_global >= 0 else "rgba(244
 day_badge_border = "rgba(16, 185, 129, 0.3)" if day_perf_global >= 0 else "rgba(244, 63, 94, 0.3)"
 day_arrow = "▲" if day_perf_global > 0 else ("▼" if day_perf_global < 0 else "■")
 
-# Injection CSS (alignement vertical au centre)
+# Injection CSS
 st.markdown(
     """
     <style>
@@ -912,11 +902,11 @@ with col_title:
     )
 
 with col_auth:
-    if not is_real_mode:
+    if not st.session_state["authenticated"]:
         with st.expander("🔒 Déverrouiller (Mode Démo)", expanded=False):
             pwd_try = st.text_input("Mot de passe", type="password", key="pwd_top_input")
             if st.button("Afficher vraies valeurs", use_container_width=True):
-                if pwd_try and pwd_try.strip() == get_authorized_password():
+                if pwd_try and pwd_try.strip() == REAL_DATA_PASSWORD:
                     st.session_state["authenticated"] = True
                     st.session_state["trigger_hacker_fx"] = True
                     st.rerun()
